@@ -1,0 +1,50 @@
+
+
+
+
+所有命令：
+
+//第一类命令： 由于输入的数据量比较大，在程序做些类似cache的设置，这样方便输入 history的东西还是可以用的。
+info crtc
+list mode
+set mode index -x value 
+
+info device (device 默认配置list）
+list device(配置的参数）
+set device  //默认是开屏动作，可以指定参数，比如link rate， lanecount， deep color bitdepth  enhancedframemode
+
+modelist  device // 
+
+info plane
+list plane 
+set plane index -x value -p patten    (overlay的东西放到这里面？)
+
+
+
+
+//第二类命令，比较少的，就不管了，直接用手输入就行了
+gamma 
+gamma
+gamma 
+
+
+csc 
+i2c
+loglevel = debug info error
+
+
+regdump:    
+cr
+sr
+crb
+in
+out
+mmio
+memw
+memr
+i2c  
+hda
+aux 
+
+loadfile
+dp ?
