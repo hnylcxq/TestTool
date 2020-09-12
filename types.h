@@ -128,7 +128,7 @@ typedef enum _SURFACE_PATTERN_
     PATTERN_COLOR_BAR,
     PATTERN_COLOR_1,
     PATTERN_COLOR_2,
-    PATTERN_ARROW,    //for cursor 
+    PATTERN_CIRCLE,    //for cursor 
     PATTERN_NUM,
 }SURFACE_PATTERN;
 

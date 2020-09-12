@@ -55,6 +55,8 @@ u32  tt_get_last_bit(u32  value)
 u32  tt_get_bit_index(u32 value)
 {
     u32 last_bit = GET_LAST_BIT(value);
+    u32 count = 0;
+
     while(last_bit)
     {
         last_bit = last_bit >> 1;
@@ -419,10 +421,10 @@ u32 tt_get_pci_info(struct base_adapter_t *base_adapter)
                         }
                         else
                         {
-                            base_adapter->flags.is_primary = 0ï¿½ï¿½
+                            base_adapter->flags.is_primary = 0£»
                         }
 
-                        found = 1ï¿½ï¿½
+                        found = 1£»
                         goto done_1;
                         
                     }
@@ -650,38 +652,6 @@ static TT_STATUS free_surface(struct dpu_adapter_t *dpu_adapter, u32 index)
     
     return TT_PASS;
 }
-
-
-
-
-void draw_RGB(struct surface_info_t * surface, u32 pos_x, u32 pos_y, u32 color)
-{
-
-    switch(surface->format)
-    {
-        case FORMAT_P8:
-            r_offset = 8;
-            g_offset = 
-            b_offset = 
-            break;
-        case FORMAT_A1R5G5B5:
-
-            break;
-        case 
-    }
-}
-
-void draw_ycbcr_422(struct surface_info_t * surface, u32 pos_x, u32 pos_y, u32 color)
-{
-
-}
-
-void draw_ycbcr_444(struct surface_info_t * surface, u32 pos_x, u32 pos_y, u32 color)
-{
-
-}
-
-
 
 
 
@@ -1024,18 +994,75 @@ color_bar_1 pattern
 .  Green (0x3ff decrease to 0) step is 1         .
 ..................................................
 .  Blue (0x3ff decrease to 0) step is 1          .
-..................................................
-.  Black (0x0 increase to 0x3fffffff) step is 1  .
-..................................................
-.  White (0x3fffffff decrease to 0) step is 1    .
 ..................................................(surface->width, surface->height)
 
 ******************************************/
 
-
-TT_STATUS draw_color_1(struct surafce_info_t *surface)
+//Used for A2R10G10B10 format  to test bitfile
+TT_STATUS draw_color_1(struct surface_info_t *surface)
 {
+    struct rect_t  rect = {0};
+    u32 i = 0,j = 0;
+    u32 color = 0 ,temp;
 
+    rect.pos_x = 0;
+    rect.pos_y = 0;
+    rect.width = 1;
+    rect.hight = 1;
+
+    for (i = 0; i < surface->height / 3; i++)
+    {
+        color = RED_COLOR;
+        for (j = 0; j < surface->width; j++)
+        {
+            temp = j % R_CHANNEL(color);
+            temp = temp << (2*CHANNEL_BIT);
+            temp = color - temp;
+
+            rect.pos_x = j;
+            rect.pos_y = i;
+            rect.width = 1;
+            rect.hight = 1;
+
+            draw_rect(surface, &rect, temp);
+        }
+    }
+
+    for (i = surface->height / 3; i < surface->height * 2 / 3; i++)
+    {
+        color = GREEN_COLOR;
+        for (j = 0; j < surface->width; j++)
+        {
+            temp = j % G_CHANNEL(color);
+            temp = temp << (CHANNEL_BIT);
+            temp = color - temp;
+
+            rect.pos_x = j;
+            rect.pos_y = i;
+            rect.width = 1;
+            rect.hight = 1;
+
+            draw_rect(surface, &rect, temp);
+        }
+    }
+
+
+    for (i = surface->height * 2 / 3; i < surface->height; i++)
+    {
+        color = BLUE_COLOR;
+        for (j = 0; j < surface->width; j++)
+        {
+            temp = j % B_CHANNEL(color);
+            temp = color - temp;
+
+            rect.pos_x = j;
+            rect.pos_y = i;
+            rect.width = 1;
+            rect.hight = 1;
+
+            draw_rect(surface, &rect, temp);
+        }
+    }
 }
 
 
