@@ -89,7 +89,7 @@ struct dpu_cb_funs_t
 
 struct dpu_manager_t
 {
-
+    void *what;
 };
 
 

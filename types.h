@@ -25,6 +25,33 @@ typedef     int                 i32;
 typedef     long long           i64;
 
 
+typedef enum _MISC_OP_TYPE
+{
+    OP_READ = 0,
+    OP_WRITE,
+}MISC_OP_TYPE;
+
+
+#define KEY_ESC                     (0x1B)
+#define KEY_BACKSPACE               (0x08)
+#define KEY_ENTER                   (10)//(0x0D)
+#define KEY_BOTTOMLINE              (95)
+#define KEY_SPACE                   (32)
+#define KEY_UP_DOWN_PRE             (0)
+#define KEY_UP                      (72)
+#define KEY_DOWN                    (80)
+#define KEY_LEFT                    (75)
+#define KEY_RIGHT                   (77)
+
+
+typedef enum _TT_STATUS_
+{
+    TT_PASS = 0,
+    TT_FAIL = 1,
+    TT_INVALID_PARAM,
+}TT_STATUS;
+
+
 
 struct rect_t
 {
@@ -33,7 +60,6 @@ struct rect_t
     u32 width;
     u32 hight;
 };
-
 
 
 struct options_table 
@@ -95,31 +121,6 @@ Cr' = 0.439*R' - 0.368*G' - 0.071*B' + 128
 
 
 
-typedef enum _MISC_OP_TYPE
-{
-    OP_READ = 0,
-    OP_WRITE,
-}MISC_OP_TYPE;
-
-
-#define KEY_ESC                     (0x1B)
-#define KEY_BACKSPACE               (0x08)
-#define KEY_ENTER                   (10)//(0x0D)
-#define KEY_BOTTOMLINE              (95)
-#define KEY_SPACE                   (32)
-#define KEY_UP_DOWN_PRE             (0)
-#define KEY_UP                      (72)
-#define KEY_DOWN                    (80)
-#define KEY_LEFT                    (75)
-#define KEY_RIGHT                   (77)
-
-
-typedef enum _TT_STATUS_
-{
-    TT_PASS = 0,
-    TT_FAIL = 1,
-    TT_INVALID_PARAM,
-}TT_STATUS;
 
 
 typedef enum _SURFACE_PATTERN_
@@ -135,12 +136,6 @@ typedef enum _SURFACE_PATTERN_
 
 
 
-
-//log level
-#define ERROR_LEVEL    0
-#define INFO_LEVEL     1
-#define WARNING_LEVEL  2
-#define DEBUG_LEVEL    3
 
 
 typedef enum _PORT_TYPE
@@ -560,7 +555,7 @@ struct mode_cmd_t
     u32  info_cmd;
     u32  help_cmd;
 
-    OUTPUT_SIGNAL output_signal;
+    u32 output_signal; //OUTPUT_SIGNAL
 
 
     u32  cmd_index; // used for cached modes
@@ -584,7 +579,7 @@ struct plane_cmd_t
     u32   surface_index;
     u32   si_valid;
     
-    PLANE_TYPE  plane_type;
+    u32  plane_type;  //PLANE_TYPE
     u32   pt_valid;         //plane_type_valid
 
     u32   src_x;
@@ -655,9 +650,9 @@ struct surface_cmd_t
 
     u32     alpha;
     u32     alpha_valid;
-    SURFACE_PATTERN     pattern;
+    u32     pattern; //SURFACE_PATTERN
 
-    SURFACE_FORMAT      format;
+    u32      format; //SURFACE_FORMAT
 
 
     u32     no_draw;
@@ -723,7 +718,7 @@ struct base_adapter_t
 	
 	u8 	    bus_num;
 	u8 	    dev_num;
-	u8  	fun_num;
+	u8  	func_num;
 	
 	u32 	mmio_base;
 	u32 	fb_base;

@@ -1,6 +1,6 @@
 #include "types.h"
 #include "config.h"
-
+#include "util.h"
 
 
 /*
@@ -47,7 +47,7 @@ void add_node(struct list_header *head, struct list_block *new_node, u32 could_m
 
     if (could_merge)
     {
-        list_for_each_entry(temp, &head->list, list_item)
+        list_for_each_entry(temp, struct list_block, &head->list, list_item)
         {
             if (temp->offset + temp->size == new_node->offset)
             {
@@ -78,7 +78,7 @@ void add_node(struct list_header *head, struct list_block *new_node, u32 could_m
         {
             head->size += new_node->size;
             head->num ++;
-            list_for_each_entry(temp, &head->list, list_item)
+            list_for_each_entry(temp, struct list_block, &head->list, list_item)
             {
                 if (temp->offset > new_node->offset)
                 {
@@ -104,7 +104,7 @@ void add_node(struct list_header *head, struct list_block *new_node, u32 could_m
         found = 0;
         head->size += new_node->size;
         head->num ++;
-        list_for_each_entry(temp, &head->list, list_item)
+        list_for_each_entry(temp, struct list_block, &head->list, list_item)
         {
            if (temp->offset > new_node->offset)
            {
@@ -170,7 +170,7 @@ u32  alloc_video_mem(struct mem_segment_t *segment, u32 size, u32 aligment)
         aligment = 0x8000; //default value
     }
 
-    list_for_each_entry(temp, &segment->free.list, list_item)
+    list_for_each_entry(temp, struct list_block, &segment->free.list, list_item)
     {
         if (size > temp->size)
         {
@@ -225,7 +225,7 @@ u32  free_video_mem(struct mem_segment_t *segment, u32 aligned_offset)
     struct list_block *temp = NULL;
     u32 ret = 1;
 
-    list_for_each_entry(temp, &segment->busy.list, list_item)
+    list_for_each_entry(temp, struct list_block, &segment->busy.list, list_item)
     {
         if (temp->aligned_offset == aligned_offset)
         {
@@ -252,7 +252,7 @@ void dump_segment(struct mem_segment_t *segment)
 
     dpu_info("\n free list : size is 0x%x ,num is 0x%x \n",segment->free.size,segment->free.num);
 
-    list_for_each_entry(temp, &segment->free.list, list_item)
+    list_for_each_entry(temp, struct list_block, &segment->free.list, list_item)
     {
         i++;
         dpu_error("Note%d:  offset is 0x%x aligned_offset is 0x%x size is 0x%x\n", i, temp->offset, temp->aligned_offset, temp->size);
@@ -261,7 +261,7 @@ void dump_segment(struct mem_segment_t *segment)
     dpu_info("\n busy list : size is 0x%x ,num is 0x%x \n",segment->busy.size,segment->busy.num);
 
     i = 0;
-    list_for_each_entry(temp, &segment->busy.list, list_item)
+    list_for_each_entry(temp, struct list_block, &segment->busy.list, list_item)
     {
         i++;
         dpu_info("Note%d:  offset is 0x%x aligned_offset is 0x%x size is 0x%x\n", i, temp->offset, temp->aligned_offset, temp->size);
@@ -302,15 +302,15 @@ void video_heap_deinit(struct mem_segment_t * segment)
     INIT_LIST_HEAD(&segment->free.list);
     INIT_LIST_HEAD(&segment->busy.list);
 
-    list_for_each_entry(temp, &segment->free.list, list_item)
+    list_for_each_entry(temp, struct list_block, &segment->free.list, list_item)
     {
-        delete_node(temp);
+        delete_node(&segment->free, temp);
         free(temp);
     }
 
-    list_for_each_entry(temp, &segment->busy.list, list_item)
+    list_for_each_entry(temp, struct list_block, &segment->busy.list, list_item)
     {
-        delete_node(temp);
+        delete_node(&segment->busy, temp);
         free(temp);
     }
     memset(segment, 0 ,sizeof(struct mem_segment_t));

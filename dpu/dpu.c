@@ -17,9 +17,11 @@ DPU_STATUS dpu_set_cb(struct dpu_cb_funs_t *dpu_cb)
    //set to  callback func.c
 
     //
+    dpu_printf("in %s\n",__func__);
+    return DPU_OK;
 }
 
-#if 0
+
 
 void* dpu_init_sw()
 {
@@ -32,37 +34,42 @@ void* dpu_init_sw()
 
 
 
-void dpu_detect_device()
+DPU_STATUS dpu_detect_device()
 {
-    
+    dpu_printf("in %s\n",__func__);
+    return DPU_OK;
 }
 
 
-void de_ip_init()
+DPU_STATUS de_ip_init(struct dpu_manager_t *dpu_manager)
 {
-	dpm->crtc_manager.hw_init();   // use chip releated func here     set bg color here ?
-	dpm->conn_manager.hw_init();   // use chipshare func here          Port Init 
-	dpm->plane_manager.hw_init();                                      //disable stream , call chip func ,chose mmio path etc.
-	dpm->encoder_manager.hw_init();
-    dpm->init_i2c_manager.hw_init();  
-    dpm->init_mdi_manager.hw_init();	//timeout, threshold, proprity,
+#if 0
+	dpu_manager->crtc_manager.hw_init();   // use chip releated func here     set bg color here ?
+	dpu_manager->conn_manager.hw_init();   // use chipshare func here          Port Init 
+	dpu_manager->plane_manager.hw_init();                                      //disable stream , call chip func ,chose mmio path etc.
+	dpu_manager->encoder_manager.hw_init();
+    dpu_manager->init_i2c_manager.hw_init();  
+    dpu_manager->init_mdi_manager.hw_init();	//timeout, threshold, proprity,
+#endif
 		
 }
 
 
-void dpu_init_hw()
+DPU_STATUS dpu_init_hw(struct dpu_manager_t *dpu_manager)
 {
-    u8 need_post;
+    u8_t need_post;
     
-    de_wait_memory_done();
+   // de_wait_memory_done();
 	
-	need_post = need_de_post();
-	do_de_post(need_post);
-	de_ip_init();
+	//need_post = need_de_post();
+	//do_de_post(need_post);
+	//de_ip_init();
+
+    dpu_printf("in %s\n",__func__);
+    return DPU_OK;
 }
 
 
-#endif
 
 DPU_STATUS dpu_set_virt_mode(struct dpu_manager_t *dpu_manager, struct dpu_virt_mode_t *mode)
 {
@@ -111,5 +118,4 @@ DPU_STATUS dpu_set_cursor(struct dpu_manager_t *dpu_manager, struct dpu_cursor_p
     dpu_printf("in %s\n",__func__);
     return DPU_OK;
 }
-
 

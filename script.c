@@ -3,27 +3,9 @@
 #include<string.h>
 
 #include"list.h"
+#include"types.h"
+#include"util.h"
 
-#define dpu_info printf
-#define dpu_error printf
-#define dpu_debug printf
-#define dpu_trace printf
-
-
-#define 	TRUE  		1
-#define 	FALSE 		0 
-
-typedef		unsigned char       BOOL;
-
-typedef     unsigned char       u8;
-typedef     unsigned short      u16;
-typedef     unsigned int        u32;
-typedef     unsigned long long  u64;
-
-typedef     char                i8;
-typedef     short               i16;
-typedef     int                 i32;
-typedef     long long           i64;
 
 
 #define SCRIPT_ARRAY_MAX_NUM  50
@@ -216,7 +198,7 @@ BOOL do_assignment(struct script_manager_t *sm, u8 words[][SCRIPT_MAX_WORD_SIZE]
 
     if (!is_array(words[0]))
     {
-        strcpy(node->name, words[0]);
+        strcpy((i8*)node->name, (i8*)words[0]);
         strcpy(node->origin_string[0], words[2]);
         
         node->num = 1;
@@ -384,7 +366,7 @@ struct variant_node_t * find_var(struct script_manager_t* sm, u8* var_name)
 
     //dpu_debug("try to find %s \n",var_name); 
     
-    list_for_each_entry(temp, &sm->var_list, node)
+    list_for_each_entry(temp, struct variant_node_t, &sm->var_list, node)
     {
         if (!strcmp(temp->name, var_name))
         {
@@ -404,7 +386,7 @@ struct variant_node_t * find_var(struct script_manager_t* sm, u8* var_name)
 }
 
 
-u8* itoa(u32 num, u8* str)
+void int_to_ascii(u32 num, u8* str)
 {
     u8 index[]="0123456789";
     u32 unum = num;
@@ -426,7 +408,6 @@ u8* itoa(u32 num, u8* str)
         str[j] = str[i - 1 + k - j];
         str[i - 1 + k - j] = temp;
     }
-    return str;
 }
 
 void replace_string(u8* dst, u8 *src, u32 name_size, u8 is_array)
@@ -586,7 +567,7 @@ void  print_codes(struct script_manager_t* sm)
 
 
     dpu_info("\nprint all the code in exec_list \n\n");
-    list_for_each_entry(node, &sm->exec_list, node)
+    list_for_each_entry(node, struct code_node_t, &sm->exec_list, node)
     {
 
         if (node->type == CODE_TYPE_LOOP_START)
@@ -616,7 +597,7 @@ struct code_node_t* find_end(struct script_manager_t *sm, struct code_node_t* st
 {
     struct code_node_t * temp = start;
     i32 i = 0;
-    list_for_each_entry_from(temp, &sm->exec_list, node)
+    list_for_each_entry_from(temp, struct code_node_t, &sm->exec_list, node)
     {
         if (temp->type == CODE_TYPE_LOOP_START)
         {
@@ -660,8 +641,8 @@ BOOL exec_loop_body(struct script_manager_t* sm, struct code_node_t *start, stru
     
         var = find_var(sm, start->count_name);
         //dpu_debug("start %d end %d i %d\n",start->start, start->end, i);
-        itoa(i, var->origin_string[0]);
-        for(temp = start; (temp != end) && (temp->node.next != &sm->exec_list);  temp = list_entry(temp->node.next, typeof(*temp), node))
+        int_to_ascii(i, var->origin_string[0]);
+        for(temp = start; (temp != end) && (temp->node.next != &sm->exec_list);  temp = list_entry(temp->node.next, struct code_node_t, node))
         {
           //  dpu_debug("i is %d, here  start is %p  end is %p temp is %p\n",i, start, end,  temp);
 
@@ -694,7 +675,7 @@ void clear_execed_code(struct script_manager_t* sm)
     struct code_node_t *node = NULL, *node2 = NULL;
     struct variant_node_t *var = NULL, *var2 = NULL;
     
-    list_for_each_entry_safe(node, node2, &sm->exec_list, node)
+    list_for_each_entry_safe(node, struct code_node_t, node2, &sm->exec_list, node)
     {
         list_del(&node->node);
         free(node);
@@ -702,7 +683,7 @@ void clear_execed_code(struct script_manager_t* sm)
 
     //delete local var
 
-    list_for_each_entry_safe(var, var2, &sm->var_list, node)
+    list_for_each_entry_safe(var, struct variant_node_t, var2, &sm->var_list, node)
     {
         if (var->scope == VAR_SCOPE_LOCAL)
         {
@@ -736,11 +717,10 @@ BOOL handle_loop_end(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZ
     }
 
 
-    list_for_each_entry(var, &sm->var_list, node)
+    list_for_each_entry(var, struct variant_node_t, &sm->var_list, node)
     {
        // dpu_debug("var->name is %s scope is %d\n",var->name, var->scope);
     }
-
 
     if (depth == 1)
     {
@@ -791,7 +771,7 @@ BOOL pre_handle_line(u8 *line_str, u8 words[][SCRIPT_MAX_WORD_SIZE], u32 *word_n
     return TRUE;
 }
 
-
+#if 0
 
 void main(int argc, char* argv[])
 {
@@ -887,7 +867,7 @@ end_1:
     }
 }
 
-
+#endif
 
 
 

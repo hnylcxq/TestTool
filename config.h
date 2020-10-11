@@ -9,7 +9,7 @@
 #define    RESERVED_MEM_SIZE  (FLAG_BUFFER_SIZE)
 
 
-#define VENDER_XX     0x1234
+#define VENDER_XX     0x1d17
 //#define MAX_CRTC_NUM    3
 //#define MAX_DEVICE_NUM  3
 //#define MAX_PLANE_NUM   2

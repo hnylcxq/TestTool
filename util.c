@@ -1,18 +1,11 @@
-#ifndef _UTIL_H_
-#define _UTIL_H_
+#include<stdio.h>
+#include<string.h>
+#include<stdarg.h>
 
-#include"serial.h"
+//#include"types.h"
+#include"util.h"
 
-
-#define LOG_BUFFER_SIZE 256
-
-
-
-#define dpu_error 	tt_print(ERROR_LEVEL, ...)
-#define dpu_info   	tt_print(INFO_LEVEL, ...)
-#define dpu_warning tt_print(WARNING_LEVEL, ...)
-#define dpu_debug   tt_print(DEBUG_LEVEL, ...)
-
+#define LOG_BUFFER_SIZE     256
 
 u32 tt_strhash(u8 *str)
 {
@@ -36,20 +29,6 @@ u32 tt_strhash(u8 *str)
     }
     return ret;
 } 
-
-
-
-u32  tt_get_last_bit(u32  value)
-{
-    u32  result = 0;
-    if (value)
-    {
-        result = value & ~(value -1);
-    }
-    return result;
-}
-
-#define GET_LAST_BIT(N) ((~((N)-1))&(N))
 
 
 u32  tt_get_bit_index(u32 value)
@@ -107,17 +86,19 @@ struct format_info_t g_format_info[FORMAT_NUM] = {
 
 
 
-void tt_print(u32 level, char * string, ...)
+void tt_print(char * string, ...)
 {
 	va_list args;
 	u8 buff[LOG_BUFFER_SIZE];
-	
+
+    #if 0
 	if (level  > g_dpu_adapter->log_level)
 	{
 		return ;
 	}
-	
-	memset(buffer, 0, LOG_BUFFER_SIZE);
+
+    #endif
+	memset(buff, 0, LOG_BUFFER_SIZE);
 	
 	va_start(args, string);
 	vsnprintf(buff, LOG_BUFFER_SIZE -1, string, args);
@@ -139,6 +120,7 @@ void tt_delay_micro_seconds(u32 value)
 	bios_delay_micro_seconds(value);
 }
 
+
 TT_CACHE_FLAG tt_get_cache_state()
 {
 	u32 cache_state = 0;
@@ -146,7 +128,6 @@ TT_CACHE_FLAG tt_get_cache_state()
 	cache_state = bios_get_cache_state();
 	
 	return cache_state ? CACHE_ENABLE : CACHE_DISABLE;
-	
 }
 
 void tt_set_cache(TT_CACHE_FLAG flag)
@@ -170,7 +151,7 @@ void tt_write_u8(void * adapter, u32 register_port, u8 value)
 	struct dpu_adapter_t * dpu_adapter = (struct dpu_adapter_t *)adapter;
 	volatile u8 * port = NULL;
 	
-	port = (u8 *)(dpu_adapter->base.mmio_phy + register_port);
+	port = (u8 *)(dpu_adapter->base.mmio_base+ register_port);
 	*port = value;
 }
 
@@ -181,7 +162,7 @@ void tt_write_u32(void * adapter, u32 register_port, u32 value)
 	volatile u32 * port = NULL;
 	u32 ul_align_mask = sizeof(u32) - 1;
 	
-	port = (u32 *)(dpu_adapter->base.mmio_phy + register_port);
+	port = (u32 *)(dpu_adapter->base.mmio_base + register_port);
 	if ((u32)port & ul_align_mask)
 	{
 		dpu_error("The port address 0x%x is not aligned \n",register_port);
@@ -197,7 +178,7 @@ u32 tt_read_u32(void * adapter, u32 register_port)
 	u32  ul_align_mask = sizeof(u32) - 1;
 	u32  value = 0;
 	
-	port = (u32 *)(dpu_adapter->base.mmio_phy + register_port);
+	port = (u32 *)(dpu_adapter->base.mmio_base + register_port);
 	if ((u32)port & ul_align_mask)
 	{
 		dpu_error("The port address 0x%x is not aligned \n",register_port);
@@ -214,7 +195,7 @@ u8 tt_read_u8(void * adapter, u32 register_port)
 	volatile u8 * port = NULL;
 	u8 value = 0 ;
 	
-	port = (u8 *)(dpu_adapter->base.mmio_phy + register_port);
+	port = (u8 *)(dpu_adapter->base.mmio_base + register_port);
 	
 	value = *port;
 	return value;
@@ -227,7 +208,7 @@ void tt_read_u16(void * adapter, u32 register_port)
 	u16 value;
 	u16  ul_align_mask = sizeof(u16) - 1;
 	
-	port = (u16 *)(dpu_adapter->base.mmio_phy + register_port);
+	port = (u16 *)(dpu_adapter->base.mmio_base + register_port);
 	if ((u32)port & ul_align_mask)
 	{
 		dpu_error("The port address 0x%x is not aligned \n",register_port);
@@ -241,7 +222,7 @@ void tt_write_u16(void * adapter, u32 register_port, u16 value)
 	volatile u16 * port = NULL;
 	u32  ul_align_mask = sizeof(u16) - 1;
 	
-	port = (u8 *)(dpu_adapter->base.mmio_phy + register_port);
+	port = (u16 *)(dpu_adapter->base.mmio_base + register_port);
 	if ((u16)port & ul_align_mask)
 	{
 		dpu_error("The port address 0x%x is not aligned \n",register_port);
@@ -365,26 +346,24 @@ static u32 get_fb_size(u32 bus, u32 dev, u32 func)
     size = (~temp | 0xF) + 1;
     bios_write_pci_config_dword(bus, dev, func, 0x14, value);
 
+    return size;
+
 }
 
-u32 tt_read_pci_config_byte(u8 bus, u8 dev, u8 func, u32 offset)
+void tt_read_pci_config_byte(u8 bus, u8 dev, u8 func, u16 reg, u8* data)
 {
-    u32 data = 0;
-
-    bios_read_pci_config_byte(bus,dev,func, offset, &data);
-
-    return data;
+    bios_read_pci_config_byte(bus,dev,func, reg, data);
 }
 
-void tt_write_pci_config_byte(u8 bus, u8 dev, u8 func, u8 data)
+void tt_write_pci_config_byte(u8 bus, u8 dev, u8 func, u16 reg, u8 data)
 {
-    bios_write_pci_config_byte(bus, dev, func, data);
+    bios_write_pci_config_byte(bus, dev, func, reg, data);
 }
 
 u32 tt_get_pci_info(struct base_adapter_t *base_adapter)
 {
 	u32 found = 0;
-	u32 bus, dev, func,
+	u32 bus, dev, func;
 	u32 data_out, data_in;
     u8 i, j, k, bcid, scid, sbn;
     u16 vendor_id, device_id;
@@ -402,15 +381,17 @@ u32 tt_get_pci_info(struct base_adapter_t *base_adapter)
                 OUTPD(CONFIG_ADDRESS, data_out);
                 data_in = INPD(CONFIG_DATA);
 
+                //dpu_info("data_in is 0x%x\n",data_in);
+
                 if ((data_in & 0xFFFF) == VENDER_XX)
                 {
                     OUTPD(CONFIG_ADDRESS, data_out + 0x8);
                     if ((INPD(CONFIG_DATA) & 0xFF000000) == 0x03000000)
                     {
                         base_adapter->vender_id = (u16)(data_in & 0xFFFF);
-                        base_adapter->device_id = (u16)(data_in & 0xFFFF);
+                        base_adapter->device_id = (u16)((data_in & 0xFFFF0000)>>16);
                         base_adapter->revision_id = (u16)(INPD(CONFIG_DATA) & 0xFF);
-                        base_adapter->bus_num = bus;
+                        base_adapter->bus_num= bus;
                         base_adapter->dev_num = dev;
                         base_adapter->func_num = func;
 
@@ -421,10 +402,10 @@ u32 tt_get_pci_info(struct base_adapter_t *base_adapter)
                         }
                         else
                         {
-                            base_adapter->flags.is_primary = 0£»
+                            base_adapter->flags.is_primary = 0;
                         }
 
-                        found = 1£»
+                        found = 1;
                         goto done_1;
                         
                     }
@@ -438,9 +419,11 @@ done_1:
 
     if (found == 0)
     {
+        dpu_info("couldn't found card \n");
         return 0;
     }
 
+   // dpu_info("lei found card \n");
     
 	for (i = 0; i < PCI_MAX_BUS_NUM; ++i)
     {
@@ -457,13 +440,14 @@ done_1:
                 bios_read_pci_config_byte(i, j, k, PCI_CLASS_DEVICE_OFFSET, &scid);
                 bios_read_pci_config_byte(i, j, k, PCI_BASE_CLASEE_OFFEST, &bcid);
 
-                if (scid != 0x04 || bcid != 0x06)     //media device or bridge device
+                if (scid != 0x04 || bcid != 0x06)
                 {
                     continue;
                 }
+                
                 bios_read_pci_config_byte(i, j, k, 0x19, &sbn);
 
-                if(sbn == base_adapter->bus)
+                if(sbn == base_adapter->bus_num)
                 {
                     base_adapter->bridge_info.bus_num = i;
                     base_adapter->bridge_info.dev_num = j;
@@ -474,13 +458,12 @@ done_1:
         }
     }   
 	
-	
 done_2:
     //bar0 info
     bios_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0x10, &value);
 
     value = value & ~0xf; //mask flag bit
-	if (bios_get_linear_addr(value, 0x80000, &value)
+	if (bios_get_linear_addr(value, 0x80000, &value))
     {
         base_adapter->mmio_base = value;
     }
@@ -490,7 +473,6 @@ done_2:
         found = 0;
         goto exit;
     }
-	
 	
 	//bar1 info
 
@@ -502,9 +484,7 @@ done_2:
         base_adapter->fb_base = value;
         base_adapter->fb_size = fb_size;
     }
-	
-	
-	
+		
 exit:	
 	
 	return found;
@@ -519,15 +499,18 @@ void tt_enable_pci_bridge(struct base_adapter_t *base_adapter)
     //check weather the bridge is host bridge or not
     //we can't change host bridge pci space.
 
-    if (!((base_adapter->bridge_info.bus == 0) && (base_adapter->bridge_info.dev ==0)))
+    if (!((base_adapter->bridge_info.bus_num == 0) && (base_adapter->bridge_info.dev_num ==0)))
     {
         do
         {
-            bios_read_pci_config_byte(base_adapter->bridge_info.bus, base_adapter->bridge_info.dev, base_adapter->bridge_info.func, PCI_COMMAND_OFFSET, &command);
+            bios_read_pci_config_byte(base_adapter->bridge_info.bus_num, 
+                base_adapter->bridge_info.dev_num, base_adapter->bridge_info.func_num, PCI_COMMAND_OFFSET, &command);
 
             command |=0x07;
-            bios_write_pci_config_byte(base_adapter->bridge_info.bus, base_adapter->bridge_info.dev, base_adapter->bridge_info.func, PCI_COMMAND_OFFSET, command);
-            bios_read_pci_config_byte(base_adapter->bridge_info.bus, base_adapter->bridge_info.dev, base_adapter->bridge_info.func, PCI_COMMAND_OFFSET, &temp);
+            bios_write_pci_config_byte(base_adapter->bridge_info.bus_num,
+                base_adapter->bridge_info.dev_num, base_adapter->bridge_info.func_num, PCI_COMMAND_OFFSET, command);
+            bios_read_pci_config_byte(base_adapter->bridge_info.bus_num, 
+                base_adapter->bridge_info.dev_num, base_adapter->bridge_info.func_num, PCI_COMMAND_OFFSET, &temp);
 
         }while (command != temp);
     }
@@ -679,7 +662,7 @@ TT_STATUS get_color_pixel(SURFACE_FORMAT format, u32 color, u32 *pixel_1, u32 *p
             break;
         case FORMAT_R5G6B5:
             *pixel_1 = ((R_CHANNEL(color) & 0x3e0) << 6)|
-                       ((G_CHANNEL(color) & 0x3f0) << 1 |
+                       ((G_CHANNEL(color) & 0x3f0) << 1) |
                        ((B_CHANNEL(color) & 0x3e0) >> 5);
             break;
         case FORMAT_A1R5G5B5:
@@ -742,7 +725,7 @@ TT_STATUS get_color_pixel(SURFACE_FORMAT format, u32 color, u32 *pixel_1, u32 *p
             break;
         case FORMAT_CRYCB2101010_32:
             *pixel_1 =  ((CR & 0x3ff) << 20) |
-                        (((Y & 0x3ff) << 10) |
+                        ((Y & 0x3ff) << 10) |
                         (CB & 0x3ff);
             break;
         default:
@@ -781,7 +764,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
         }
     }
 
-    ret = get_color_pixel(&pixel_1, &pixel_2)
+    ret = get_color_pixel(surface->format, color, &pixel_1, &pixel_2);
 
     if (ret != TT_PASS)
     {
@@ -860,12 +843,12 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
                         }
                         else
                         {
-                            *(u32)base = (u32)pixel_1 * surface->alpha / 255;
+                            *(u32*)base = (u32)pixel_1 * surface->alpha / 255;
                         }
                     }
                     else
                     {
-                        *(u32)base = (u32)pixel_1;
+                        *(u32*)base = (u32)pixel_1;
                     }
                 }
             }
@@ -970,9 +953,9 @@ static TT_STATUS draw_color_circle(struct surface_info_t *surface)
 
     for (i = 0; i < h; i++)
     {
-        for (j = 0; j < w; j ++)
+        for (j = 0; j < w; j++)
         {
-            if ( (h*h)*(i - w/4)(i - w/4) + (w*w) *(j - h/4)(j - h/4) <= w*w*h*h)
+            if (((h * h)*(i - w / 4)*(i - w / 4) + (w * w) *(j - h / 4)*(j - h / 4)) <= w * w * h * h)
             {
                 temp = (u32*)(surface->cpu_addr + i * surface->pitch + j);
                 *temp = alpha << 24 | R << 16 | G << 8 | B;
@@ -1149,7 +1132,7 @@ TT_STATUS  tt_create_surface(struct dpu_adapter_t *dpu_adapter, struct surface_c
     surface->height = surface_cmd->height;
     surface->format = surface_cmd->format;
     surface->compressed = surface_cmd->compressed;
-    surface->need_premult = surface_cmd->need_premult;
+    surface->need_premult = surface_cmd->premult;
     surface->pattern = surface_cmd->pattern;
     surface->alpha = surface_cmd->alpha;
     surface->aligned_width = tt_align(surface->width, dpu_adapter->width_alignment);
@@ -1158,7 +1141,7 @@ TT_STATUS  tt_create_surface(struct dpu_adapter_t *dpu_adapter, struct surface_c
     surface->bit_cnt = g_format_info[surface->format].bit_cnt;
     memcpy(surface->format_name, g_format_info[surface->format].format_name, FORMAT_NAME_LENGTH);
     
-    surface->size = surface->aligned_width * surface->hight * surface->bit_cnt / 8;
+    surface->size = surface->aligned_width * surface->height * surface->bit_cnt / 8;
     surface->pitch = surface->aligned_width * surface->bit_cnt / 8;
 
     
@@ -1199,4 +1182,3 @@ end_surface:
 }
    
 
-#endif

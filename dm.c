@@ -1,14 +1,17 @@
-
-
+#include"dpu/dpu.h"
+#include"util.h"
+#include"types.h"
+#include<stdio.h>
+#include<string.h>
 
 //所有call cbios 的interface 都需要走这里下去，相当于disp层，做参数转换的。
 
 
 void dm_set_callback()
 {
-    struct dpu_cb_funs_t   cb_funs = {0};
+    struct dpu_cb_funs_t   cb_funs;
 
-    cb_funs.size = sizeof(struct dpu_cb_funs_t);
+    memset(&cb_funs, 0, sizeof (struct dpu_cb_funs_t));
 
     cb_funs.cb_print = (void*)dpu_info;
     cb_funs.cb_delay_us = (void*)tt_delay_micro_seconds;
@@ -24,7 +27,7 @@ void dm_set_callback()
     cb_funs.cb_spin_unlock = NULL;
     cb_funs.cb_mutex_lock = NULL;
     cb_funs.cb_mutex_unlock = NULL;
-    cb_funs.cb_strcmp = (void*)strcmp
+    cb_funs.cb_strcmp = (void*)strcmp;
     cb_funs.cb_strcpy = (void*)strcpy;
     cb_funs.cb_strncmp = (void*)strncmp;
     cb_funs.cb_memset = (void*)memset;
@@ -40,24 +43,17 @@ void dm_set_callback()
 
 
 
-
-
-
-
 void dm_query_crtc_info(struct dpu_adapter_t * dpu_adapter)
 {
-    //dpu_query_crtc_info()
+    //dpu_query_crtc_info() from dpu.c
     //crtc_num,  plane num of each crtc
 
     dpu_adapter->num_crtc = 3;
     dpu_adapter->num_plane[0] = 2;
     dpu_adapter->num_plane[1] = 2;
-    dpu_adapter->num_plane[3] = 2;
+    dpu_adapter->num_plane[2] = 2;
 
 }
-
-
-
 
 
 void dm_init_sw(struct dpu_adapter_t *dpu_adapter)
@@ -77,22 +73,24 @@ void dm_init_sw(struct dpu_adapter_t *dpu_adapter)
 
 void dm_init_hw(struct dpu_adapter_t *dpu_adapter)
 {
-    dpu_init_hw();
+    dpu_init_hw(dpu_adapter->dpu_manager);
 }
 
 void dm_init_crtc(struct dpu_adapter_t *dpu_adapter)
 {
-    dm_query_crtc_info();
+    u32 i = 0;
 
-    dpu_adapter->crtc[0].index = 0;
-    dpu_adapter->crtc[1].index = 1;
-    dpu_adapter->crtc[2].index = 2;
+    dm_query_crtc_info(dpu_adapter);
+    
+    for (i = 0; i < dpu_adapter->num_crtc; i++)
+    {
+        dpu_adapter->current_crtc_info[i].index = i;
+        dpu_adapter->current_crtc_info[i].output = 0;
+        memset(&dpu_adapter->current_crtc_info[i].src_mode, 0 , sizeof(struct mode_info_t));
+        memset(&dpu_adapter->current_crtc_info[i].dst_mode, 0 , sizeof(struct mode_info_t));
+    }
 
 }
-
-
-
-
 
 void dm_init_plane(struct dpu_adapter_t *dpu_adapter)
 {
@@ -103,11 +101,12 @@ void dm_init_plane(struct dpu_adapter_t *dpu_adapter)
     {
         for (j = 0; j < dpu_adapter->num_plane[i]; j++)
         {
-            dpu_adapter->plane[i][j].crtc_index = i;
-            dpu_adapter->plane[i][j].plane_type = PRIMARY_PLANE + j;
-
-            dpu_adapter->plane[i][j].plane_ctrl = 0;
-            dpu_adapter->plane[i][j].plane_state = PLANE_DISABLED;
+            memset(&dpu_adapter->current_plane_info[i][j], 0 , sizeof(struct plane_info_t));
+            dpu_adapter->current_plane_info[i][j].crtc_index = i;
+            dpu_adapter->current_plane_info[i][j].plane_type = PRIMARY_PLANE + j;
+            dpu_adapter->current_plane_info[i][j].csc_para.op = 1;
+            dpu_adapter->current_plane_info[i][j].plane_state = PLANE_DISABLED;
+            
         }
     }
 }
@@ -116,23 +115,22 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
 {
     u8 i = 0;
 
-
     dpu_adapter->support_device = PORT_0 | PORT_1 | PORT_2;
-    dpu_adapter->active_output = 0;
+    dpu_adapter->active_output[0] = 0;
 
 
-    for (i = 0, i < MAX_DEVICE_NUM; i++)
+    for (i = 0; i < PORT_NUM; i++)
     {
-         dpu_adapter->output[i].connect_status = DISCONNECTED_STATUS;
-         dpu_adapter->output[i].port_index = PORT_0<<i;
+        memset(&dpu_adapter->current_output_info[i], 0 , sizeof(struct output_info_t));
+        dpu_adapter->current_output_info[i].connect_status = DISCONNECTED_STATUS;
+        dpu_adapter->current_output_info[i].power_status = POWER_OFF;
     }
    
 
+    //TODO: need detect para
+    dpu_detect_device(dpu_adapter->dpu_manager);
 
-    dpu_detect_device();
-
-    dpu_adapter->active_output = PORT_0 | PORT_1 | PORT_2;
-    
+    dpu_adapter->active_output[0] = PORT_0 | PORT_1 | PORT_2;
 }
 
 
@@ -145,8 +143,8 @@ void dm_init_surfaces(struct dpu_adapter_t *dpu_adapter)
 
     for (i = 0; i < MAX_SURFACE_NUM; i++)
     {
-        dpu_adapter->surface_manager.surfaces[i].valid = 0
-        dpu_adapter->surface_manager.surfaces[i].index = i;
+        //dpu_adapter->surface_manager.surfaces[i].valid = 0;
+        memset(&dpu_adapter->surface_manager.surfaces[i], 0, sizeof(dpu_adapter->surface_manager.surfaces[i]));
     }
 
 }
@@ -193,7 +191,9 @@ void dm_init_cached_cmd(struct dpu_adapter_t *dpu_adapter)
     plane->plane_type = PRIMARY_PLANE;
     plane->disable_plane = 0;
 
-    plane->overlay_info_valid = 0;
+    //plane->overlay_info_valid = 0;
+    plane->overlay_cmd.k_valid = 0;
+    plane->overlay_cmd.m_valid = 0;
 
     device = &dpu_adapter->cached_cmd[DEVICE_CMD][0].device_cmd;
     dpu_adapter->cached_cmd[DEVICE_CMD][0].valid = 1;
@@ -207,13 +207,11 @@ void dm_init_cached_cmd(struct dpu_adapter_t *dpu_adapter)
     device->color_format = 0;
     device->lane_count = 4;
     device->link_rate = 1;
-    device->op = 1;
+    device->disable = 0;
 }
 
 void init_dm(struct dpu_adapter_t *dpu_adapter)
 {
-    
-
     dm_init_sw(dpu_adapter);
 
     dm_init_hw(dpu_adapter);
@@ -229,18 +227,12 @@ void init_dm(struct dpu_adapter_t *dpu_adapter)
     dm_init_cached_cmd(dpu_adapter);
 
 
-
-    dpu_adapter->width_alignment = 32;   //surface width is 256bit aligment 
-    dpu_adapter->offset_alignment = 0x8000 // 
-
-
-    
-
-    
-
+    dpu_adapter->width_alignment = 64;   //surface width is 256bit aligment   cursor need 512bit aligment ?
+    dpu_adapter->offset_alignment = 0x8000; // 
 }
+
 
 void deinit_dm()
 {
-
+    //All sw state ?
 }

@@ -1,4 +1,5 @@
 
+#include"types.h"
 #define SERIAL_COM1   0x2e8
 #define SERIAL_COM2   0x3f8
 
@@ -6,28 +7,14 @@
 #define CONFIG_COM    SERIAL_COM1
 
 
+
+
+#define PORTB           0x61
+#define TIMER_CONTROL   0x43
+#define TIMER_COUNTER2  0x42
+
 static unsigned long long tick_in_5700us;
 
-//pci space offset
-#define  PCI_VENDOR_ID_OFFSET		0x00
-#define  PCI_DEVICE_ID_OFFSET       0x02
-#define  PCI_COMMAND_OFFSET         0x04
-#define  PCI_CLASS_DEVICE_OFFSET    0x0A
-#define  PCI_BASE_CLASEE_OFFEST     0x0B
-#define  PCI_BAR0_OFFSET            0x10
-#define  PCI_BAR1_OFFSET            0x14
-#define  PCI_SUBVENDOR_ID_OFFSET    0x2C
-#define  PCI_SUBSYSTEM_ID_OFFSET    0x2E
-#define  PCI_ROM_BASE_OFFSET        0x30
-
-#define  PCI_MAX_BUS_NUM     	0x86
-#define  PCI_MAX_DEVICE_NUM  	2
-#define  PCI_MAX_FUNCTION_NUM  	2
-
-
-//io to config pci space
-#define CONFIG_ADDRESS          0x0CF8
-#define CONFIG_DATA             0x0CFC
 
 static void bios_clear_time_counter()
 {
@@ -246,22 +233,18 @@ void bios_write_io(u8 * register_port, u8 value)
 
 
 
-void bios_helper_init();
+void bios_helper_init()
 {
 	tick_in_5700us = bios_ticks_in_5700us();
 	
 }
 
-
-
-
-
-u32 bios_read_pci_config_byte(u8 bus, u8 dev, u8 func,
-                                       u32 reg, u8 *data)
+u16 bios_read_pci_config_byte(u8 bus, u8 dev, u8 func, u16 reg, u8 *data)
 {
-	u32 ret = 0x0;
+	u16 retval = 0x0000;
 	
-	_asm{
+	_asm
+    {
 		mov bh, bus
         mov al, dev
         mov bl, func
@@ -277,17 +260,16 @@ u32 bios_read_pci_config_byte(u8 bus, u8 dev, u8 func,
         
     RBError:
         shr ax, 8
-        
-        mov ret,ax
+        mov retval, ax
     };
-    return ret;
+    return retval;
 }
 
 
 u16 bios_read_pci_config_word(u8 bus, u8 dev, u8 func,
                                        u16 reg, u16 *data)
 {
-	u16 ret = 0x0;
+	u16 retval = 0x0;
 	_asm{
         mov bh, bus
         mov al, dev
@@ -305,15 +287,15 @@ u16 bios_read_pci_config_word(u8 bus, u8 dev, u8 func,
     RWError:
         shr ax, 8
 
-        mov ret,ax
+        mov retval,ax
     };
-    return ret;
+    return retval;
 }
 
 u16 bios_write_pci_config_byte(u8 bus, u8 dev, u8 func,
                                     u16 reg, u8 data)
 {
-	u16 ret = 0x0;
+	u16 retval = 0x0;
 	
 	_asm{
 		mov bh, bus
@@ -328,15 +310,15 @@ u16 bios_write_pci_config_byte(u8 bus, u8 dev, u8 func,
         int 1Ah 
         shr ax, 8       
         
-        mov ret,ax
+        mov retval,ax
     };
-    return ret;
+    return retval;
 }
 
 u16 bios_write_pci_config_word(u8 bus, u8 dev, u8 func,
                                           u16 reg,  u16 data)
 {
-	u16 ret = 0x0;
+	u16 retval = 0x0;
 	
 	_asm{
 		mov bh, bus
@@ -351,16 +333,16 @@ u16 bios_write_pci_config_word(u8 bus, u8 dev, u8 func,
         int 1Ah 
         shr ax, 8       
         
-        mov ret,ax
+        mov retval,ax
     };
-    return ret;
+    return retval;
 }
 
 
 u16 bios_write_pci_config_dword(u8 bus, u8 dev, u8 func,
                                            u16 reg, u32 data)
 {
-	u16 ret = 0x0;
+	u16 retval = 0x0;
 	
 	_asm{
 		mov bh, bus
@@ -375,15 +357,15 @@ u16 bios_write_pci_config_dword(u8 bus, u8 dev, u8 func,
         int 1Ah 
         shr ax, 8       
         
-        mov ret,ax
+        mov retval,ax
     };
-    return ret;
+    return retval;
 }
 
 u16 bios_read_pci_config_dword(u8 bus, u8 dev, u8 func,
 											u16 reg, u32 *data)
 {
-	u16 ret = 0x0;
+	u16 retval = 0x0;
 	
 	_asm{
 		mov bh, bus
@@ -401,12 +383,10 @@ u16 bios_read_pci_config_dword(u8 bus, u8 dev, u8 func,
     RDError:
         shr ax, 8
 
-        mov ret,ax
+        mov retval,ax
     };
-    return ret;
+    return retval;
 }
-
-
 
 
 // Todo: int31 ?
@@ -417,8 +397,8 @@ u32 bios_get_linear_addr(u32 phy_addr, u32 size, u32 *linear_addr)
 
     _asm{
         mov     ax,  0x0800
-        mov     edi, phySize
-        mov     ecx, phyAddr
+        mov     edi, size
+        mov     ecx, phy_addr
         shld    esi, edi, 0x10
         shld    ebx, ecx, 0x10
         int     0x31

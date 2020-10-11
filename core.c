@@ -10,8 +10,6 @@
 #include"dpu/dpu.h"
 
 
-
-
 //must sync with OUTPUT_SIGNAL
 static u8  *g_output_signal_string[] = {" INVALID"," RGB"," YUV444", " YUV422", "YUV420"};
 
@@ -75,6 +73,12 @@ static u8 *g_cursor_type_string[] =
     "PREMULT TYPE",
     "COVERAGE TYPE",
 };
+
+static struct mode_cmd_t  g_mode_cmd = {0};
+static struct plane_cmd_t g_plane_cmd = {0};
+static struct surface_cmd_t g_surface_cmd = {0};
+static struct device_cmd_t g_device_cmd = {0};
+static struct cursor_cmd_t g_cursor_cmd = {0};
 
 static struct options_table mode_options_table[] = 
 {
@@ -409,7 +413,7 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
         goto end;
     }
 
-    printf("GET_LAST_BIT is %d, output is %d\n",tt_get_bit_index(prepare_cmd.output),prepare_cmd.output);
+   // printf("GET_LAST_BIT is %d, output is %d\n",tt_get_bit_index(prepare_cmd.output),prepare_cmd.output);
 
     dpu_adapter->current_output_info[tt_get_bit_index(prepare_cmd.output) - 1].power_status = POWER_ON;
     dpu_adapter->current_output_info[tt_get_bit_index(prepare_cmd.output) - 1].crtc = 
@@ -1127,28 +1131,7 @@ static TT_STATUS free_surface(struct dpu_adapter_t *dpu_adapter, u32 index)
     return TT_PASS;
 }
 
-struct format_info_t g_format_info[FORMAT_NUM] = {
-        {2, "Monochrome"},   //FORMAT_MONO
-        {8, "RGB8"},         //FORMAT_P8
-        {16, "RGB565"},      //FORMAT_R5G6B5
-        {16, "ARGB1555"},    //FORMAT_A1R5G5B5
-        {32, "ARGB8888"},    //FORMAT_A8R8G8B8
-        {32, "ABGR8888"},    //FORMAT_A8B8G8R8
-        {32, "XRGB8888"},    //FORMAT_X8R8G8B8
-        {32, "XBGR8888"},    //FORMAT_X8B8G8R8
-        {32, "ARGB2101010"}, //FORMAT_A2R10G10B10
-        {32, "ABGR2101010"}, //FORMAT_A2B10G10R10
-        {16, "CRYCBY422_16"},//FORMAT_CRYCBY422_16
-        {16, "YCRYCB422_16"},//FORMAT_YCRYCB422_16
-        {32, "CRYCBY422_32"},//FORMAT_CRYCBY422_32
-        {32, "YCRYCB422_32"},//FORMAT_YCRYCB422_32
-        {32, "YCBCR8888"},   //FORMAT_YCBCR8888_32
-        {32, "CRYCB8888"},   //FORMAT_CRYCB8888_32
-        {32, "YCBCR2101010_32"},//FORMAT_YCBCR2101010_32
-        {32, "CRYCB2101010_32"},//FORMAT_CRYCB2101010_32
-        {1,  "INVALID_FORMAT"}, //FORMAT_NUM
-};
-
+#if 0
 TT_STATUS  tt_create_surface(struct dpu_adapter_t *dpu_adapter, struct surface_cmd_t *surface_cmd)
 {
     u32  width = 0, aligned_width = 0;
@@ -1199,7 +1182,7 @@ end_surface:
     return status;
     
 }
-   
+#endif
 
 static TT_STATUS surface_handle(struct dpu_adapter_t *dpu_adapter, struct surface_cmd_t *surface_cmd)
 {
@@ -1885,22 +1868,6 @@ static void misc_handle_trace(u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_nu
 }
 
 
-#if 0
-u32 tt_read_pci_config_byte(u8 bus, u8 dev, u8 func, u32 offset, u8 *value)
-{
-    static u32 i = 0;
-    
-    *value = i++;
-    //dpu_info("read pci bus 0x%x dev 0x%x func 0x%x offset 0x%x\n",bus, dev, func, offset);
-}
-
-void tt_write_pci_config_byte(u8 bus, u8 dev, u8 func, u32 offset ,u8 data)
-{
-    dpu_info("write pci bus 0x%x dev 0x%x func 0x%x offset 0x%x data 0x%x\n", bus, dev, func, offset, data);
-}
-
-#endif
-
 static void handle_pcir(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
 {
     u8 bus = 0, dev = 0, func = 0;
@@ -2025,19 +1992,6 @@ static void handle_reg(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
      
 
 }
-
-u32 tt_read_buffer_u32(volatile u32 *register_port)
-{
-	static u32 i = 0x12345678;
-
-    return i = i+ 0x111;
-}
-
-void tt_write_buffer_u32(volatile u32 * register_port, u32 value)
-{
-
-}
-
 
 static void handle_mem(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num, MISC_OP_TYPE op )
 {
@@ -2262,7 +2216,7 @@ static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
     struct dpu_aux_para_t aux_para = {0};
     u32 port = 0;
     u32 offset = 0;
-    u32 value = 0, temp = 0, old = 0;
+    u8 value = 0, temp = 0, old = 0;
     u8  get_value = 0;
 
     if (word_num < 3)
@@ -2545,7 +2499,7 @@ struct support_cmd g_support_cmd[] =
 };
 
 
-static void process_cmd(struct dpu_adapter_t *dpu_adapter)
+void process_cmd(struct dpu_adapter_t *dpu_adapter)
 {
     TT_STATUS ret = TT_PASS;
     struct options_table *table;
@@ -2573,7 +2527,6 @@ static void process_cmd(struct dpu_adapter_t *dpu_adapter)
         memset(cmd_line, 0 , 512);
 
         memset(str, 0, 50*MAX_CMD_OPTION_NAME_SIZE);
-
 
         putchar('>');
         i = 0;

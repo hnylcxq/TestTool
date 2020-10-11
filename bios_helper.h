@@ -4,10 +4,6 @@
 
 
 
-#define OUTPD(a,b)  outpd((a),(b))
-#define INPD(a)     inpd((a))
-
-
 
 void bios_helper_init();
 void bios_write_io(u8 * register_port, u8 value);

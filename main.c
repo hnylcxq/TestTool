@@ -2,20 +2,15 @@
 #include"util.h"
 
 
-
-
 struct dpu_adapter_t  *g_dpu_adapter = NULL;
-
-void help(void)
-{
-	dpu_info();
-
-}
-
 
 void deinit_adapter()
 {
-
+    if (g_dpu_adapter)
+    {
+        free(g_dpu_adapter);
+        g_dpu_adapter = NULL;
+    }
 }
 
 struct dpu_adapter_t* init_adapter(int run_on_qt)
@@ -39,6 +34,8 @@ struct dpu_adapter_t* init_adapter(int run_on_qt)
 TT_STATUS tt_enable_card(struct base_adapter_t * base_adapter)
 {
     //TODO change to set 850c[1] = 1
+
+#if 0    
     u8 mm850c = 0;
     TT_STATUS ret = TT_PASS;
 
@@ -50,7 +47,7 @@ TT_STATUS tt_enable_card(struct base_adapter_t * base_adapter)
 
         tt_delay_micro_seconds(1);
         
-        mm850c = tt_read_mmio_byte(base_adapter->mmio_base£¬ 0x850c);
+        mm850c = tt_read_mmio_byte(base_adapter->mmio_base, 0x850c);
         if (!(mm850c & 0x02))
         {
             dpu_error("fatal error:  enable card failed !!!\n");
@@ -59,6 +56,7 @@ TT_STATUS tt_enable_card(struct base_adapter_t * base_adapter)
     }
 
     return ret;
+#endif
 }
 
 TT_STATUS init_card_info()
@@ -83,10 +81,11 @@ TT_STATUS init_card_info()
     }
 
 
-    tt_init_card();
+    tt_init_card(&g_dpu_adapter->base);
 
     return ret;
 }
+extern void process_cmd(struct dpu_adapter_t *dpu_adapter);
 
 void main(int argc, char** argv)
 {
@@ -111,22 +110,22 @@ void main(int argc, char** argv)
 		dpu_error("init adapter failed \n");
 		goto end;
 	}
-	
+
 	ret = init_card_info();
     if (ret == TT_FAIL)
     {
         dpu_error("init card info faild ");
+        goto end;
     }
+
+    dpu_info("mmio base is 0x%x   fb base is 0x%x  size 0x%x\n", p->base.mmio_base, p->base.fb_base, p->base.fb_size);
 
     init_dm(p);
 
    	init_video_memory(p);
 
-
     process_cmd(p);
     
-
-
     deinit_dm(p);
     deinit_video_memory();
 
