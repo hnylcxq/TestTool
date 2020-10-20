@@ -36,14 +36,15 @@
 #define WARNING_LEVEL  2
 #define DEBUG_LEVEL    3
 
+#define OUTPUT_UART
 
-#ifdef DOS
+#ifdef OUTPUT_UART
 
 #define dpu_error	    tt_print
 #define dpu_info   	    tt_print
 #define dpu_warning     tt_print
 #define dpu_debug       tt_print
-#define dpu_trace       tt_print
+
 
 #else
 
@@ -52,13 +53,14 @@
 #define dpu_warning     printf
 #define dpu_debug       printf
 
+#endif
+
 #ifdef DEBUG
 #define dpu_trace       printf
 #else
 #define dpu_trace
 #endif
 
-#endif
 
 typedef enum _TT_CACHE_FLAG
 {

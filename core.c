@@ -2338,16 +2338,16 @@ static void handle_file(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
 void handle_help()
 {
 
-    dpu_info("mode -help  for mode help info\n");
-    dpu_info("plane -help  for plane help info\n");
+    dpu_info("mode    -help  for mode help info\n");
+    dpu_info("plane   -help  for plane help info\n");
     dpu_info("surface -help  for surface help info\n");
-    dpu_info("device -help  for device help info\n");
-    dpu_info("cursor -help  for cursor help info \n");
+    dpu_info("device  -help  for device help info\n");
+    dpu_info("cursor  -help  for cursor help info \n");
 
     
     dpu_info("\n In misc handle below ,all data is hex\n\n");
     
-    dpu_info("pcir bus dev func  [offset] [value] \n");
+    dpu_info("pcir  bus  dev  func  [offset] [value] \n");
     dpu_info("cr    index   [value]\n");
     dpu_info("crb   index   [value]\n");
     dpu_info("sr    index   [value]\n");
@@ -2356,15 +2356,15 @@ void handle_help()
     dpu_info("memr  offset  [length]\n");
     dpu_info("memw  offset   value [length]\n");
     dpu_info("dump  [file_name]  dump all regs to console/file\n");
-    dpu_info("i2c group  addr offset value \n");
-    dpu_info("aux port offset value\n");
-    dpu_info("lf filename offset \n");     //TODO: maybe we need surface index ?
-    dpu_info("sf filename offset size \n");
-    dpu_info("csc <path> <index1>  [index2] \n");
+    dpu_info("i2c   group  addr   offset value \n");
+    dpu_info("aux   port   offset value\n");
+    dpu_info("lf    filename     offset \n");     //TODO: maybe we need surface index ?
+    dpu_info("sf    filename     offset size \n");
+    dpu_info("csc   <path>  <index1>  [index2] \n");
     dpu_info("  path: 1 :plane csc   index1 = crtc index  index2 = plane index\n");  //plane csc just test csc ? 
                                                                                      //device csc test color enhancement ?
     dpu_info("  path: 2 :device csc  index1 = port index\n");
-    dpu_info("gamma <index> <domain> <mode> \n");
+    dpu_info("gamma   <index> <domain> <mode> \n");
     dpu_info("   index: crtc index \n");
     dpu_info("   domain: 1: primary only 2: overlay only 3: blend data \n");
     dpu_info("   mode :  1: 8bit single, 2: 8bit split 3: 10bit single 4: 10bit split \n");
@@ -2378,6 +2378,7 @@ static void handle_csc(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 
    //put csc para to output_info_t
 
+    dpu_info("in handle csc \n");
 }
 
 
@@ -2385,12 +2386,14 @@ static void handle_gamma(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_
 {
     //test gamma 
 
+    dpu_info("in handle gamma \n");
+
 }
 
 static void handle_hda(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
 {
     //How ?
-
+    dpu_info("in handle hda\n");
 }
 
 
@@ -2499,6 +2502,67 @@ struct support_cmd g_support_cmd[] =
 };
 
 
+void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
+{
+    u32 i;
+    u8 ch;
+    u8 *position = NULL;
+
+    dpu_info(">");
+  
+    position = cmd_line;
+    do{
+
+        ch = getch();
+
+       // dpu_info("ch is %d ",ch);
+
+        if ((ch != KEY_ENTER) && (ch != KEY_BACKSPACE) && (ch != KEY_ESC))
+        {
+            *position = ch;
+            position ++;
+            
+            dpu_info("%c", ch);
+        }
+        else if (ch == KEY_BACKSPACE)
+        {
+            
+            if (position > cmd_line)
+            {
+                position --;
+            }
+            *position = '\0';
+ 
+            i = position - cmd_line;
+
+            dpu_info("%c", KEY_BACKSPACE);
+            dpu_info("%c", KEY_SPACE);
+            dpu_info("%c", KEY_BACKSPACE);
+
+        }
+        else if (ch == KEY_ESC)  //clear all cmd_line
+        {
+            i = position - cmd_line;
+
+            while (i > 0)
+            {
+                *position = '\0';
+                dpu_info("%c", KEY_BACKSPACE);
+                dpu_info("%c", KEY_SPACE);
+                dpu_info("%c", KEY_BACKSPACE);
+                i--;
+                position--;
+            }
+            //position = cmd_line;
+        }
+       // printf("ch is %d\n",ch);
+        
+    }while(ch != KEY_ENTER);
+
+    *position = '\0';
+    dpu_info("\n");
+}
+
 void process_cmd(struct dpu_adapter_t *dpu_adapter)
 {
     TT_STATUS ret = TT_PASS;
@@ -2513,7 +2577,7 @@ void process_cmd(struct dpu_adapter_t *dpu_adapter)
     u32   word_num = 0;
 
 
-    u8   cmd_line[512];
+    u8   cmd_line[MAX_CMD_STRING_NUM];
     u8   str[50][MAX_CMD_OPTION_NAME_SIZE];
     u8   ch;
     u8   *word;
@@ -2524,11 +2588,15 @@ void process_cmd(struct dpu_adapter_t *dpu_adapter)
 
     while(1)
     {
-        memset(cmd_line, 0 , 512);
+        memset(cmd_line, 0 , MAX_CMD_STRING_NUM);
 
         memset(str, 0, 50*MAX_CMD_OPTION_NAME_SIZE);
 
-        putchar('>');
+        get_input(dpu_adapter, cmd_line);
+
+        #if 0
+        //dpu_info(">");
+        //putchar('>');
         i = 0;
         ch = getchar();
         do{
@@ -2538,6 +2606,7 @@ void process_cmd(struct dpu_adapter_t *dpu_adapter)
         }while(ch != KEY_ENTER);
 
         cmd_line[i] = '\0';
+        #endif
         word = strtok(cmd_line, filter);
    
         if(word != NULL)

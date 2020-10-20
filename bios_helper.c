@@ -1,7 +1,9 @@
 
 #include"types.h"
-#define SERIAL_COM1   0x2e8
-#define SERIAL_COM2   0x3f8
+#define SERIAL_COM1   0x3f8
+#define SERIAL_COM2   0x2f8
+#define SERIAL_COM3   0x3f8
+#define SERIAL_COM4   0x2e8
 
 
 #define CONFIG_COM    SERIAL_COM1
@@ -141,21 +143,23 @@ void bios_delay_micro_seconds(u32 value)
 }
 
 
-void bios_print(char * string)
+void bios_print(u8 * string)
 {
 	u32 i;
-	
+
+    i = 0;
+
 	while (string[i])
 	{
 		if (string[i] == '\n')
 		{
 			outp(CONFIG_COM, '\r');
+            bios_delay_micro_seconds(87);
 		}
 		outp(CONFIG_COM, string[i]);
 		bios_delay_micro_seconds(87);
 		i++;
 	}
-
 }
 
 // bios_get_cache_state
@@ -164,7 +168,7 @@ void bios_print(char * string)
 u32 bios_get_cache_state()
 {
 	u32 t = 0;
-	u32 ret = 0;     
+	u32 ret = 0;
 	
 	_asm{
         mov eax,cr0
@@ -233,10 +237,24 @@ void bios_write_io(u8 * register_port, u8 value)
 
 
 
+//set com :115200 n 8
+
+void bios_init_com(u16 base)
+{
+    outp(base + 0x3, 0x80);
+    outp(base, 1);
+    outp(base + 0x1, 0);
+    outp(base + 0x3,0);
+    outp(base + 0x3,0x3);
+
+}
+
 void bios_helper_init()
 {
 	tick_in_5700us = bios_ticks_in_5700us();
-	
+
+
+    bios_init_com(CONFIG_COM);
 }
 
 u16 bios_read_pci_config_byte(u8 bus, u8 dev, u8 func, u16 reg, u8 *data)

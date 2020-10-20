@@ -125,7 +125,7 @@ void main(int argc, char** argv)
    	init_video_memory(p);
 
     process_cmd(p);
-    
+
     deinit_dm(p);
     deinit_video_memory();
 

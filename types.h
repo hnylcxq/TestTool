@@ -34,14 +34,13 @@ typedef enum _MISC_OP_TYPE
 
 #define KEY_ESC                     (0x1B)
 #define KEY_BACKSPACE               (0x08)
-#define KEY_ENTER                   (10)//(0x0D)
-#define KEY_BOTTOMLINE              (95)
+#define KEY_ENTER                   (0xD)
 #define KEY_SPACE                   (32)
-#define KEY_UP_DOWN_PRE             (0)
 #define KEY_UP                      (72)
 #define KEY_DOWN                    (80)
 #define KEY_LEFT                    (75)
 #define KEY_RIGHT                   (77)
+
 
 
 typedef enum _TT_STATUS_
@@ -50,7 +49,6 @@ typedef enum _TT_STATUS_
     TT_FAIL = 1,
     TT_INVALID_PARAM,
 }TT_STATUS;
-
 
 
 struct rect_t

@@ -22,6 +22,8 @@
 
 #define MAX_CMD_OPTION_NAME_SIZE  20
 
+#define MAX_CMD_STRING_NUM      512
+
 
 #define CR_BASE     0x8800
 #define CR_B_BASE   0x8900
