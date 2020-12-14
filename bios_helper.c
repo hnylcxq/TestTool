@@ -149,17 +149,17 @@ void bios_print(u8 * string)
 
     i = 0;
 
-	while (string[i])
-	{
-		if (string[i] == '\n')
-		{
-			outp(CONFIG_COM, '\r');
+    while (string[i])
+    {
+        if (string[i] == '\n')
+        {
+            outp(CONFIG_COM, '\r');
             bios_delay_micro_seconds(87);
-		}
-		outp(CONFIG_COM, string[i]);
-		bios_delay_micro_seconds(87);
-		i++;
-	}
+        }
+        outp(CONFIG_COM, string[i]);
+        bios_delay_micro_seconds(87);
+        i++;
+    }
 }
 
 // bios_get_cache_state

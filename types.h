@@ -40,6 +40,8 @@ typedef enum _MISC_OP_TYPE
 #define KEY_DOWN                    (80)
 #define KEY_LEFT                    (75)
 #define KEY_RIGHT                   (77)
+#define KEY_UP_DOWN_PRE             (0)
+
 
 
 
@@ -56,7 +58,7 @@ struct rect_t
     u32 pos_x;
     u32 pos_y;
     u32 width;
-    u32 hight;
+    u32 height;
 };
 
 
@@ -112,9 +114,9 @@ Cr' = 0.439*R' - 0.368*G' - 0.071*B' + 128
 */
 #define RGB2YCBCR_FACTOR 10000
 
-#define RGB2Y(R, G, B)  ((0.299 * RGB2YCBCR_FACTOR * R  + 0.587 * RGB2YCBCR_FACTOR * G + 0.144 * RGB2YCBCR_FACTOR * B)/RGB2YCBCR_FACTOR + 16)
-#define RGB2CB(R, G, B) ((0.148 * RGB2YCBCR_FACTOR * R  - 0.291 * RGB2YCBCR_FACTOR * G + 0.439 * RGB2YCBCR_FACTOR * B)/RGB2YCBCR_FACTOR + 128)
-#define RGB2CR(R, G, B) ((0.439 * RGB2YCBCR_FACTOR * R  - 0.368 * RGB2YCBCR_FACTOR * G - 0.071 * RGB2YCBCR_FACTOR * B)/RGB2YCBCR_FACTOR + 128)
+#define RGB2Y(R, G, B)  ((0.257 * RGB2YCBCR_FACTOR * (R)  + 0.504 * RGB2YCBCR_FACTOR * (G) + 0.098 * RGB2YCBCR_FACTOR * (B))/RGB2YCBCR_FACTOR + 16)
+#define RGB2CB(R, G, B) ((-0.148 * RGB2YCBCR_FACTOR * (R)  - 0.291 * RGB2YCBCR_FACTOR * (G) + 0.439 * RGB2YCBCR_FACTOR * (B))/RGB2YCBCR_FACTOR + 128)
+#define RGB2CR(R, G, B) ((0.439 * RGB2YCBCR_FACTOR * (R)  - 0.368 * RGB2YCBCR_FACTOR * (G) - 0.071 * RGB2YCBCR_FACTOR * (B))/RGB2YCBCR_FACTOR + 128)
 
 
 
@@ -140,7 +142,7 @@ typedef enum _PORT_TYPE
 {
     PORT_0 = 0x1,
     PORT_1 = 0x2,
-    PORT_2 = 0x4,
+    PORT_2 = 0x3,
     PORT_NUM = 3,   // 枚举的定义中值是可以重复的，名字不能重复， 还是相当于宏定义一样，完成多个的宏定义的一起定义
 }PORT_TYPE;
 
@@ -168,7 +170,7 @@ typedef enum _OUTPUT_SIGNAL_
 
 struct mode_info_t
 {
-    u32  x_res;
+    u32  x_res;  //change to hdisplay later ?
     u32  y_res;
     
     u32  refresh_rate;
@@ -197,7 +199,7 @@ struct crtc_info_t
     u8      index;
 
     u32     output;
-    struct mode_info_t    src_mode, dst_mode;
+    struct mode_info_t    hw_mode, adjust_mode;
 };
 
 typedef enum _PLANE_TYPE_
@@ -290,7 +292,6 @@ struct overlay_info_t
 typedef enum _SURFACE_FORMAT_T
 {
     FORMAT_INVALID =0,
-    FORMAT_MONO,
     FORMAT_P8,
     FORMAT_R5G6B5,
     FORMAT_A1R5G5B5,
@@ -304,10 +305,8 @@ typedef enum _SURFACE_FORMAT_T
     FORMAT_YCRYCB422_16,
     FORMAT_CRYCBY422_32,
     FORMAT_YCRYCB422_32,
-    FORMAT_YCBCR8888_32,
     FORMAT_CRYCB8888_32,
     FORMAT_YCBCR2101010_32,
-    FORMAT_CRYCB2101010_32,
     FORMAT_NUM,
 }SURFACE_FORMAT;
 
@@ -493,7 +492,7 @@ struct mem_segment_t
     u32    available_size;   
     u32    mem_size;
     u32    offset;
-    u32    reserved_mem_size;
+    u32    reserved_mem_size;   //used for flag buffer, ring buffer ,need refine later
     u32    init_done;
 
     struct list_header  free;
@@ -771,6 +770,10 @@ struct dpu_adapter_t
 
     struct  cached_cmd_t  cached_cmd[MAX_CMD_NUM][MAX_CACHED_CMD_NUM];
 
+    u8      cmd_history[MAX_INPUT_HISTORY_NUM][MAX_CMD_STRING_NUM];
+
+    u32     cmd_num;
+    
     u32     log_level; //control log output
     
 	union

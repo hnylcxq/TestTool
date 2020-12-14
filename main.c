@@ -81,7 +81,7 @@ TT_STATUS init_card_info()
     }
 
 
-    tt_init_card(&g_dpu_adapter->base);
+    tt_init_card(g_dpu_adapter);
 
     return ret;
 }

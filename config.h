@@ -23,6 +23,7 @@
 #define MAX_CMD_OPTION_NAME_SIZE  20
 
 #define MAX_CMD_STRING_NUM      512
+#define MAX_INPUT_HISTORY_NUM      10
 
 
 #define CR_BASE     0x8800
@@ -35,5 +36,3 @@
 
 
 #endif
-
-

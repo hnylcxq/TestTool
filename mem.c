@@ -275,7 +275,7 @@ void init_video_memory(struct dpu_adapter_t *dpu_adapter)
 {
     struct mem_segment_t * p_seg = NULL;
 
-    tt_set_cache(CACHE_DISABLE);// here set uncached ???? 没有必要开cache ?
+   // tt_set_cache(CACHE_DISABLE);// here set uncached ???? 没有必要开cache ?
 
     //dpu just support local memory 
     p_seg = &dpu_adapter->vidmm_mgr.mem_segments[LOCAL_SEGMENT];

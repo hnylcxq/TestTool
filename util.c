@@ -62,7 +62,7 @@ u8 tt_get_bit_num(u32 value)
 
 
 struct format_info_t g_format_info[FORMAT_NUM] = {
-        {2, "Monochrome"},   //FORMAT_MONO
+        {1, "FORMAT_INVALID"},//FORMAT_INVALID
         {8, "RGB8"},         //FORMAT_P8
         {16, "RGB565"},      //FORMAT_R5G6B5
         {16, "ARGB1555"},    //FORMAT_A1R5G5B5
@@ -76,15 +76,31 @@ struct format_info_t g_format_info[FORMAT_NUM] = {
         {16, "YCRYCB422_16"},//FORMAT_YCRYCB422_16
         {32, "CRYCBY422_32"},//FORMAT_CRYCBY422_32
         {32, "YCRYCB422_32"},//FORMAT_YCRYCB422_32
-        {32, "YCBCR8888"},   //FORMAT_YCBCR8888_32
         {32, "CRYCB8888"},   //FORMAT_CRYCB8888_32
         {32, "YCBCR2101010_32"},//FORMAT_YCBCR2101010_32
-        {32, "CRYCB2101010_32"},//FORMAT_CRYCB2101010_32
-        {1,  "INVALID_FORMAT"}, //FORMAT_NUM
 };
 
+void temp_print(int level, char *string, ...)
+{
+    va_list args;
+    u8 buff[LOG_BUFFER_SIZE];
 
+#if 0
+    if (level  > g_dpu_adapter->log_level)
+    {
+        return ;
+    }
 
+#endif
+    memset(buff, 0, LOG_BUFFER_SIZE);
+
+    va_start(args, string);
+    vsnprintf(buff, LOG_BUFFER_SIZE -1, string, args);
+    va_end(args);
+
+    bios_print(buff);
+
+}
 
 void tt_print(char * string, ...)
 {
@@ -146,6 +162,333 @@ void tt_set_cache(TT_CACHE_FLAG flag)
 	bios_set_cache_state(cache_state);
 }
 
+
+
+u8 tt_mmio_read_reg(
+    void*                   adapter,
+    u16                    type_index,
+    u32                   IGAEncoderIndex
+    )
+{
+    u8        byRet;
+    u32       mmioAddress;
+    u8        type = (u8) ((type_index&0xFF00) >> 8);
+    u8        index = (u8) (type_index&0x00FF);
+    u8        inType = type;
+
+    if(IGAEncoderIndex == 1)
+    {
+        if(type == CR)
+        {
+            inType = CR_B;
+        }
+        else if(type == SR)
+        {
+            inType = SR_B;
+        }
+    }
+    else if(IGAEncoderIndex == 2)
+    {
+        if(type == CR)
+        {
+            inType = CR_T;
+        }
+        else if(type == SR)
+        {
+            inType = SR_T;
+        }
+    }
+
+    if(IGAEncoderIndex == 7)
+    {
+        if(type == SR)
+        {
+            inType = SR_B;
+        }
+        else if(type == CR)
+        {
+            inType = CR_B;
+        }
+    }
+
+    switch(inType)
+    {
+    case MISC:
+        byRet = tt_read_u32(adapter, CB_MISC_OUTPUT_READ_REG);
+        break;
+    case CR:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_A_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case CR_B:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_B_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case CR_T:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_T +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case CR_C:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_C_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case CR_D:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case CR_D_0:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D0_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case CR_D_1:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D1_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break; 
+    case CR_D_2:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D2_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case CR_D_3:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D3_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case SR:
+        {
+            mmioAddress = MMIO_OFFSET_SR_GROUP_A_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+     case SR_B: 
+        {
+            mmioAddress = MMIO_OFFSET_SR_GROUP_B_ELT +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case SR_T: 
+        {
+            mmioAddress = MMIO_OFFSET_SR_GROUP_T +index;
+            byRet = tt_read_u8(adapter, mmioAddress);
+        }
+        break;
+    case AR:
+        {
+            tt_read_u8(adapter, CB_ATTR_INITIALIZE_REG);
+            tt_write_mmio_byte(adapter, CB_ATTR_ADDR_REG, index, 0);
+            byRet = tt_read_u8(adapter, CB_ATTR_DATA_READ_REG);
+        }
+        break;
+    case GR:
+        {
+            tt_write_mmio_byte(adapter, CB_GRAPH_ADDR_REG, index, 0);
+            byRet = tt_read_u8(adapter, CB_GRAPH_DATA_REG);
+        }
+        break;
+    default:
+        break;
+    }
+    return byRet;
+}
+
+void tt_mmio_write_reg(
+    void                    *adapter,
+    u16                    type_index,
+    u8                    value,
+    u8                    mask,
+    u32                   IGAEncoderIndex
+    )
+{
+    u8                byTemp;         //Temp value, also save register's old value
+    u32               mmioAddress;
+    u8                type = (u8) ((type_index&0xFF00) >> 8);
+    u8                index = (u8) (type_index&0x00FF);
+    u8                inType = type;
+
+    if(IGAEncoderIndex == 1)
+    {
+        if(type == CR)
+        {
+            inType = CR_B;
+        }
+        else if(type == SR)
+        {
+            inType = SR_B;
+        }
+    }
+    else if(IGAEncoderIndex == 2)
+    {
+        if(type == CR)
+        {
+            inType = CR_T;
+        }
+        else if(type == SR)
+        {
+            inType = SR_T;
+        }
+    }
+
+    if(IGAEncoderIndex == 7)
+    {
+        if(type == SR)
+        {
+            inType = SR_B;
+        }
+        else if(type == CR)
+        {
+            inType = CR_B;
+        }
+    }
+
+    switch(inType)
+    {
+    case MISC:
+        {
+            byTemp = tt_read_u8(adapter, CB_MISC_OUTPUT_READ_REG);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, CB_MISC_OUTPUT_READ_REG, byTemp, 0);
+        }
+        break;
+    case CR:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_A_ELT + index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case CR_B:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_B_ELT + index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case CR_T:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_T + index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case CR_C: 
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_C_ELT +index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case CR_D: 
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D_ELT +index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case CR_D_0:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D0_ELT + index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case CR_D_1:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D1_ELT + index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case CR_D_2:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D2_ELT +index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case CR_D_3:
+        {
+            mmioAddress = MMIO_OFFSET_CR_GROUP_D3_ELT +index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case SR:    //SR_A
+        {
+            mmioAddress = MMIO_OFFSET_SR_GROUP_A_ELT +index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case SR_B:  //HDTV2 registers
+        {
+            mmioAddress = MMIO_OFFSET_SR_GROUP_B_ELT +index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case SR_T:
+        {
+            mmioAddress = MMIO_OFFSET_SR_GROUP_T +index;
+            byTemp =  tt_read_u8(adapter, mmioAddress);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
+        }
+        break;
+    case AR:
+        {
+            tt_read_u8(adapter, CB_ATTR_INITIALIZE_REG);
+            tt_write_mmio_byte(adapter, CB_ATTR_ADDR_REG, index, 0);
+            byTemp = tt_read_u8(adapter, CB_ATTR_DATA_READ_REG);
+            byTemp = (byTemp & mask) | value;
+            tt_read_u8(adapter, CB_ATTR_INITIALIZE_REG);
+            tt_write_mmio_byte(adapter, CB_ATTR_ADDR_REG, index, 0);
+            tt_write_mmio_byte(adapter, CB_ATTR_DATA_WRITE_REG, byTemp, 0);
+        }
+        break;
+    case GR:
+        {
+            tt_write_mmio_byte(adapter, CB_GRAPH_ADDR_REG, index, 0);
+            byTemp = tt_read_u8(adapter, CB_GRAPH_DATA_REG);
+            byTemp = (byTemp & mask) | value;
+            tt_write_mmio_byte(adapter, CB_GRAPH_ADDR_REG, byTemp, 0);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+
+
+
+
 void tt_write_u8(void * adapter, u32 register_port, u8 value)
 {
 	struct dpu_adapter_t * dpu_adapter = (struct dpu_adapter_t *)adapter;
@@ -181,7 +524,7 @@ u32 tt_read_u32(void * adapter, u32 register_port)
 	port = (u32 *)(dpu_adapter->base.mmio_base + register_port);
 	if ((u32)port & ul_align_mask)
 	{
-		dpu_error("The port address 0x%x is not aligned \n",register_port);
+		dpu_error("The port address 0x%x is not aligned  %p mask 0x%x\n",register_port,port,ul_align_mask);
 	}
 	
 	value = *port;
@@ -247,7 +590,7 @@ void tt_write_buffer_u32(volatile u32 * register_port, u32 value)
 {
 	u32 ul_align_mask = sizeof(u32) - 1;
 	
-	if ((u32 ) register_port & ul_align_mask)
+	if ((u32)register_port & ul_align_mask)
 	{
 		dpu_error("The mem address 0x%x is not aligned \n",register_port);
 	}
@@ -304,7 +647,7 @@ void * tt_malloc_mem(u32 bytes)
 {
 	void * p = malloc(bytes);
 	
-	if (p)
+	if (!p)
 	{
 		dpu_error(" malloc memory failed \n");
 	}
@@ -536,13 +879,18 @@ void tt_enable_mmio_access(struct base_adapter_t *base_adapter)
 
 
 
-void tt_init_card(struct base_adapter_t *base_adapter)
+void tt_init_card(struct dpu_adapter_t *dpu_adapter)
 {
 
     //set mxu boundary / snoop boundary   490a0 ?
 
     //mxu boundary need local memory size , need pmp info ?
     //maybe could set mxu boundary to bar1 size for convenience
+
+    tt_write_u32(dpu_adapter,  0x49000, 0x801);
+    tt_write_u32(dpu_adapter,  0x49004, 0x80);
+    tt_write_u32(dpu_adapter,  0x49008, 0x0);
+    tt_write_u32(dpu_adapter,  0x490a0, 0x3f1f1f1f);
 }
 
 
@@ -580,7 +928,7 @@ void  tt_free_video_mem(struct dpu_adapter_t *dpu_adapter, u32 aligned_offset)
 }
 
 
-static struct surface_info_t* alloc_surface(struct dpu_adapter_t *dpu_adapter)
+struct surface_info_t* alloc_surface(struct dpu_adapter_t *dpu_adapter)
 {
     u32 i = 0;
 
@@ -613,6 +961,8 @@ static struct surface_info_t* alloc_surface(struct dpu_adapter_t *dpu_adapter)
     {
         dpu_adapter->surface_manager.surfaces[i].valid = 1;
         dpu_adapter->surface_manager.num++;
+        
+        surface->index = i;        
     }
 
     return surface;
@@ -620,7 +970,7 @@ static struct surface_info_t* alloc_surface(struct dpu_adapter_t *dpu_adapter)
 }
 
 
-static TT_STATUS free_surface(struct dpu_adapter_t *dpu_adapter, u32 index)
+TT_STATUS free_surface(struct dpu_adapter_t *dpu_adapter, u32 index)
 {
 
     if (index >= MAX_SURFACE_NUM || dpu_adapter->surface_manager.surfaces[index].valid == 0)
@@ -628,6 +978,8 @@ static TT_STATUS free_surface(struct dpu_adapter_t *dpu_adapter, u32 index)
         dpu_error("%s:  invalid para \n",__func__);
         return TT_FAIL;
     }
+
+    tt_free_video_mem(dpu_adapter, dpu_adapter->surface_manager.surfaces[index].surface.gpu_addr);
 
     dpu_adapter->surface_manager.surfaces[index].valid = 0;
     memset(&dpu_adapter->surface_manager.surfaces[index].surface, 0 , sizeof(struct surface_info_t));
@@ -649,9 +1001,18 @@ TT_STATUS get_color_pixel(SURFACE_FORMAT format, u32 color, u32 *pixel_1, u32 *p
     TT_STATUS ret = TT_PASS;
 
 
-    Y  = RGB2Y(R_CHANNEL(color), G_CHANNEL(color), B_CHANNEL(color));
-    CB = RGB2CB(R_CHANNEL(color), G_CHANNEL(color), B_CHANNEL(color));
-    CR = RGB2CR(R_CHANNEL(color), G_CHANNEL(color), B_CHANNEL(color));
+    // 10bit RGB -> YCBCR 10bit formula ?
+
+    //temp use 8bit
+    Y  = RGB2Y(R_CHANNEL(color)>>2, G_CHANNEL(color)>>2, B_CHANNEL(color)>>2);
+    CB = RGB2CB(R_CHANNEL(color)>>2, G_CHANNEL(color)>>2, B_CHANNEL(color)>>2);
+    CR = RGB2CR(R_CHANNEL(color)>>2, G_CHANNEL(color)>>2, B_CHANNEL(color)>>2);
+
+
+   // dpu_error("color is 0x%x, R 0x%x G 0x%x  B 0x%x \n",color,R_CHANNEL(color),G_CHANNEL(color),B_CHANNEL(color));
+    
+    //dpu_error("Y 0x%x CB 0x%x CR 0x%x \n",Y,CB,CR);
+
     
     switch(format)
     {
@@ -665,12 +1026,14 @@ TT_STATUS get_color_pixel(SURFACE_FORMAT format, u32 color, u32 *pixel_1, u32 *p
                        ((G_CHANNEL(color) & 0x3f0) << 1) |
                        ((B_CHANNEL(color) & 0x3e0) >> 5);
             break;
-        case FORMAT_A1R5G5B5:
+#if 0
+        case FORMAT_A1R5G5B5:   //hw no this format right ?
 
             *pixel_1 = ((R_CHANNEL(color) & 0x3e0) << 5) |
                        ((G_CHANNEL(color) & 0x3e0))|
                        ((B_CHANNEL(color) & 0x3e0) >> 5);
             break;
+#endif
         case FORMAT_A8R8G8B8:
         case FORMAT_X8R8G8B8:
 
@@ -685,49 +1048,72 @@ TT_STATUS get_color_pixel(SURFACE_FORMAT format, u32 color, u32 *pixel_1, u32 *p
                        ((G_CHANNEL(color) & 0x3fc) << 6) |
                        ((R_CHANNEL(color) & 0x3fc) >> 2);
             break;
+        case FORMAT_A2B10G10R10:
+
+            *pixel_1 = ((B_CHANNEL(color) & 0x3ff) << 20)|
+                       ((G_CHANNEL(color) & 0x3ff) << 10)|
+                       ((R_CHANNEL(color) & 0x3ff));
+
+            break;
+        case FORMAT_A2R10G10B10:
+
+            *pixel_1 = ((R_CHANNEL(color) & 0x3ff) << 20)|
+                       ((G_CHANNEL(color) & 0x3ff) << 10)|
+                       ((B_CHANNEL(color) & 0x3ff));
+
+            break;
         case FORMAT_CRYCBY422_16:
 
-            *pixel_1 = ((CR & 0x3fc) << 6) | ((Y & 0x3fc) >> 2);
-            *pixel_2 = ((CB & 0x3fc) << 6) | ((Y & 0x3fc) >> 2);
+            *pixel_1 = ((CR & 0xff) << 8) | (Y & 0xff);
+            *pixel_2 = ((CB & 0xff) << 8) | (Y & 0xff);
             break;
         case FORMAT_YCRYCB422_16:
 
-            *pixel_1 = ((Y & 0x3fc) << 6) | ((CR & 0x3fc) >> 2);
-            *pixel_2 = ((Y & 0x3fc) << 6) | ((CB & 0x3fc) >> 2);
+            *pixel_1 = ((Y & 0xff) << 8) | (CR & 0xff);
+            *pixel_2 = ((Y & 0xff) << 8) | (CB & 0xff);
             break;
+
+        //DPU don't support 16bit path
+#if 0           
         case FORMAT_CRYCBY422_32:
 
-            *pixel_1 = ((CR & 0x3ff) << 22) | ((Y & 0x3ff) << 6);
-            *pixel_2 = ((CB & 0x3ff) << 22) | ((Y & 0x3ff) << 6);
+            *pixel_1 = ((CR & 0xff) << 16) | ((Y & 0xff));
+            *pixel_2 = ((CB & 0xff) << 22) | ((Y & 0xff));
             break;
         case FORMAT_YCRYCB422_32:
 
-            *pixel_1 = ((Y & 0x3ff) << 22) | ((CR & 0x3ff) << 6);
-            *pixel_2 = ((Y & 0x3ff) << 22) | ((CB & 0x3ff) << 6);
+            *pixel_1 = ((Y & 0xff) << 22) | ((CR & 0xff) << 6);
+            *pixel_2 = ((Y & 0xff) << 22) | ((CB & 0xff) << 6);
             break;
+#endif
+#if 0
         case FORMAT_YCBCR8888_32:
 
             *pixel_1 = ((Y & 0x3fc) << 14 )|
                        ((CB & 0x3fc) << 6) |
                        ((CR & 0x3fc) >> 2);
             break;
+#endif
         case FORMAT_CRYCB8888_32:
 
-            *pixel_1 =  ((CR & 0x3fc) << 14) |
-                        ((Y  & 0x3fc) << 6) |
-                        ((CB & 0x3fc) >> 2);
+            *pixel_1 =  ((CR & 0xff) << 16) |
+                        ((Y  & 0xff) << 8) |
+                        ((CB & 0xff) );
             break;
+        //bit map is crycb
         case FORMAT_YCBCR2101010_32:
 
-            *pixel_1 = ((Y & 0x3ff) << 20) |
-                       ((CB & 0x3ff) << 10) |
-                       (CR & 0x3ff);
+            *pixel_1 = ((CR & 0xff) << 22) |
+                       ((Y & 0xff) << 12) |
+                       (CB & 0xff)<< 2;
             break;
+#if 0            
         case FORMAT_CRYCB2101010_32:
             *pixel_1 =  ((CR & 0x3ff) << 20) |
                         ((Y & 0x3ff) << 10) |
                         (CB & 0x3ff);
             break;
+#endif            
         default:
 
             dpu_error("unknow format \n");
@@ -753,9 +1139,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
     u8 *base = NULL;
 
     if (surface->format == FORMAT_YCRYCB422_16 ||
-        surface->format == FORMAT_CRYCBY422_16 ||
-        surface->format == FORMAT_CRYCBY422_32 ||
-        surface->format == FORMAT_YCRYCB422_32)
+        surface->format == FORMAT_CRYCBY422_16)
     {
         if (rect->pos_x % 2 || rect->width % 2)  //right ?
         {
@@ -800,12 +1184,14 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
         return;
     }
     
-    base = (u8*)(surface->cpu_addr + surface->pitch * rect->pos_y + rect->pos_x * surface->bit_cnt / 8);
-    for (i = 0; i < rect->hight; i++)
+    //base = (u8*)(surface->cpu_addr + surface->pitch * rect->pos_y + rect->pos_x * surface->bit_cnt / 8);
+    for (i = rect->pos_y; i < rect->height + rect->pos_y; i++)
     {
-        for (j = 0; j < rect->width; j++)
+        for (j = rect->pos_x; j < rect->width + rect->pos_x; j++)
         {
-            base += i * surface->pitch + j * surface->bit_cnt / 8;
+            //base += i * surface->pitch + j * surface->bit_cnt / 8;
+
+            base = (u8*)(surface->cpu_addr + surface->pitch * i + j * surface->bit_cnt / 8);
             
             if (draw_8bit)
             {
@@ -816,7 +1202,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
                 if(draw_two_pixel)
                 {
                     *(u16*)base = (u16)pixel_1;
-                    *(u16*)((u8)base + 2) = (u16)pixel_2;
+                    *(u16*)(base + 2) = (u16)pixel_2;
                     j++;
                 }
                 else
@@ -829,7 +1215,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
                 if(draw_two_pixel)
                 {
                     *(u32*)base = (u32)pixel_1;
-                    *(u32*)((u8)base + 4) = (u32)pixel_2;
+                    *(u32*)(base + 4) = (u32)pixel_2;
                     j++;
                 }
                 else
@@ -887,13 +1273,13 @@ static TT_STATUS draw_color_bar(struct surface_info_t* surface)
     rect.pos_x = 0;
     rect.pos_y = 0;
     rect.width = surface->width;
-    rect.hight = surface->height / 5;
+    rect.height = surface->height / 5;
 
     draw_rect(surface, &rect, RED_COLOR);
 
     rect.pos_y = surface->height / 5;
     draw_rect(surface, &rect, GREEN_COLOR);
-    
+
     rect.pos_y = surface->height * 2 / 5;
     draw_rect(surface, &rect, BLUE_COLOR);
 
@@ -902,6 +1288,33 @@ static TT_STATUS draw_color_bar(struct surface_info_t* surface)
 
     rect.pos_y = surface->height * 4 / 5;
     draw_rect(surface, &rect, WHITE_COLOR);
+
+
+    rect.pos_x = 0;
+    rect.pos_y = 0;
+    rect.width = 2;
+    rect.height = surface->height;
+    draw_rect(surface, &rect, WHITE_COLOR);
+
+    rect.pos_x = 0;
+    rect.pos_y = 0;
+    rect.width = surface->width;
+    rect.height = 2;
+    draw_rect(surface, &rect, WHITE_COLOR);
+
+    rect.pos_x = surface->width - 2;
+    rect.pos_y = 0;
+    rect.width = 2;
+    rect.height = surface->height;
+    draw_rect(surface, &rect, WHITE_COLOR);
+
+    rect.pos_x = 0;
+    rect.pos_y = surface->height - 2 ;
+    rect.width = surface->width;
+    rect.height = 2;
+    draw_rect(surface, &rect, WHITE_COLOR);
+
+    return TT_PASS;
 }
 
 
@@ -920,6 +1333,7 @@ static u8 is_support_premult(struct surface_info_t *surface)
         return 0;
     }
 }
+#define abs(a) ((a) > 0 ? (a) : -(a))
 
 //https://tool.oschina.net/commons?type=3
 static TT_STATUS draw_color_circle(struct surface_info_t *surface)
@@ -931,7 +1345,14 @@ static TT_STATUS draw_color_circle(struct surface_info_t *surface)
     u8  B = 150;
     u8  alpha = surface->alpha;
 
-    u32 x,y,w,h;
+    u64 w,h;
+
+
+    if (surface->format != FORMAT_A8R8G8B8)
+    {
+       dpu_info("arrow is used for cursor, just support ARGB8888 ? \n");
+       return TT_FAIL;
+    }
 
     if (surface->need_premult)
     {
@@ -940,25 +1361,23 @@ static TT_STATUS draw_color_circle(struct surface_info_t *surface)
         B = (B * surface->alpha)/255;
     }
 
-    if (surface->format != FORMAT_A8R8G8B8)
-    {
-        dpu_info("arrow is used for cursor, just support ARGB8888 ? \n");
-        return TT_FAIL;
-    }
 
-    h = surface->height / 2;
-    w = surface->width / 2;
-    x = w /2;
-    y = h / 2;
+    h = surface->height;
+    w = surface->width;
 
-    for (i = 0; i < h; i++)
+    for (i = 0; i < surface->height; i++)
     {
-        for (j = 0; j < w; j++)
+        for (j = 0; j < surface->width; j++)
         {
-            if (((h * h)*(i - w / 4)*(i - w / 4) + (w * w) *(j - h / 4)*(j - h / 4)) <= w * w * h * h)
+            temp = (u32*)(surface->cpu_addr + i * surface->pitch + j * surface->bit_cnt / 8);
+            if ((4*(h * h)*abs(j - w / 2)*abs(j - w / 2) + 4*(w * w) *abs(i - h / 2)*abs(i - h / 2)) <= w * w * h * h)
             {
-                temp = (u32*)(surface->cpu_addr + i * surface->pitch + j);
+               
                 *temp = alpha << 24 | R << 16 | G << 8 | B;
+            }
+            else
+            {
+                *temp = 0xffffff;
             }
         }
     }
@@ -988,10 +1407,19 @@ TT_STATUS draw_color_1(struct surface_info_t *surface)
     u32 i = 0,j = 0;
     u32 color = 0 ,temp;
 
+
+
+    if (surface->format != FORMAT_A2R10G10B10)
+    {
+        dpu_info("color bar 1 just support A2R10G10B10 format \n");
+        return TT_FAIL;
+    }
+
+
     rect.pos_x = 0;
     rect.pos_y = 0;
     rect.width = 1;
-    rect.hight = 1;
+    rect.height = 1;
 
     for (i = 0; i < surface->height / 3; i++)
     {
@@ -1005,7 +1433,7 @@ TT_STATUS draw_color_1(struct surface_info_t *surface)
             rect.pos_x = j;
             rect.pos_y = i;
             rect.width = 1;
-            rect.hight = 1;
+            rect.height = 1;
 
             draw_rect(surface, &rect, temp);
         }
@@ -1023,7 +1451,7 @@ TT_STATUS draw_color_1(struct surface_info_t *surface)
             rect.pos_x = j;
             rect.pos_y = i;
             rect.width = 1;
-            rect.hight = 1;
+            rect.height = 1;
 
             draw_rect(surface, &rect, temp);
         }
@@ -1041,7 +1469,7 @@ TT_STATUS draw_color_1(struct surface_info_t *surface)
             rect.pos_x = j;
             rect.pos_y = i;
             rect.width = 1;
-            rect.hight = 1;
+            rect.height = 1;
 
             draw_rect(surface, &rect, temp);
         }
@@ -1071,9 +1499,13 @@ TT_STATUS tt_draw_surface(struct surface_info_t  *surface)
     }
 
 
+    //Note P8,need config gamma
+
     if (surface->format == FORMAT_INVALID ||
-        surface->format == FORMAT_P8 ||
-        surface->format == FORMAT_MONO ||
+        surface->format == FORMAT_P8 || 
+        surface->format == FORMAT_A1R5G5B5 ||
+        surface->format == FORMAT_CRYCBY422_32 ||
+        surface->format == FORMAT_YCRYCB422_32 ||
         surface->format >=FORMAT_NUM)
     {
         dpu_error("Unsupport format 0x%x\n",surface->format);
@@ -1150,11 +1582,25 @@ TT_STATUS  tt_create_surface(struct dpu_adapter_t *dpu_adapter, struct surface_c
 
     if (offset == 0)
     {
-        goto end_video_mem;
+       // goto end_video_mem;
     }
 
     surface->gpu_addr = offset;
-    surface->cpu_addr = dpu_adapter->base.mmio_base + offset;
+    surface->cpu_addr = dpu_adapter->base.fb_base + offset;
+
+
+
+    dpu_info("width is %d, height is %d, format is %d, compressed is %d, need_pre is %d, pattern %d pitch is %d \n",
+        surface->width,
+        surface->height,
+        surface->format,
+        surface->compressed,
+        surface->need_premult,
+        surface->pattern,
+        surface->pitch
+        );
+
+    dpu_info("gpu_addr is 0x%x, cpu_addr is 0x%x, fb base is 0x%x\n",surface->gpu_addr, surface->cpu_addr, dpu_adapter->base.fb_base);
 
     //TODO:
     //draw surface with alpha & color pattern & format
