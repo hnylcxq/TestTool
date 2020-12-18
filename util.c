@@ -882,22 +882,6 @@ void tt_enable_mmio_access(struct base_adapter_t *base_adapter)
 
 
 
-void tt_init_card(struct dpu_adapter_t *dpu_adapter)
-{
-
-    //set mxu boundary / snoop boundary   490a0 ?
-
-    //mxu boundary need local memory size , need pmp info ?
-    //maybe could set mxu boundary to bar1 size for convenience
-
-    tt_write_u32(dpu_adapter,  0x49000, 0x801);
-    tt_write_u32(dpu_adapter,  0x49004, 0x80);
-    tt_write_u32(dpu_adapter,  0x49008, 0x0);
-    tt_write_u32(dpu_adapter,  0x490a0, 0x3f1f1f1f);
-}
-
-
-
 
 
 u32  tt_alloc_video_mem(struct dpu_adapter_t *dpu_adapter, u32 size, u32 aligment)

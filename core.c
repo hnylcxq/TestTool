@@ -271,6 +271,12 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
 
     mode_handle_trace(mode_info);
 
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        goto end;
+    }
+
     if (mode_info->list_cmd)
     {
         mode_handle_list(dpu_adapter);
@@ -661,6 +667,14 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
     u32 need_page_flip = 1;
     i32 i = 0, j = 0;
 
+    plane_handle_trace(plane_cmd);
+
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        goto end;
+    }
+
 /***
     CBIOS_SURFACE_ATTRIB  stream_attr = {0};
     CBIOS_WINDOW_PARA  src_win = {0};
@@ -669,8 +683,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
     CBIOS_STREAM_PARA   stream_para = {0};
     CBIOS_UPDATE_FRAME_PARA  update_frame = {0};
 
-    plane_handle_trace(plane_cmd);
-
+ 
     if (plane_cmd->list_cmd)
     {
         plane_handle_list(dpu_adapter);
@@ -1617,6 +1630,13 @@ static TT_STATUS device_handle(struct dpu_adapter_t *dpu_adapter, struct device_
     struct device_cmd_t *cached_cmd = NULL;
 
     device_handle_trace(device_cmd);
+
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        goto end;
+    }
+
     if (device_cmd->info_cmd)
     {
         device_handle_info(dpu_adapter);
@@ -1858,7 +1878,14 @@ static TT_STATUS cursor_handle(struct dpu_adapter_t *dpu_adapter, struct cursor_
     u32 need_set = 1;
     i32 i = 0, j = 0;
 
+
     cursor_handle_trace(cursor_cmd);
+    
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        goto end;
+    }
 
     if (cursor_cmd->list_cmd)
     {
@@ -2303,6 +2330,13 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
     u8 value = 0, temp = 0, old = 0, sum = 0;
     u8 get_offset = 0, get_value = 0;
     u32 i = 0, j = 0;
+
+
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        return;
+    }
 /***
     struct dpu_i2c_para_t i2c_para = {0};
 
@@ -2411,6 +2445,13 @@ static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
     u32 offset = 0;
     u8 value = 0, temp = 0, old = 0;
     u8  get_value = 0;
+
+
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        return;
+    }
 
     if (word_num < 3)
     {
@@ -2569,6 +2610,12 @@ static void handle_csc(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 {
    struct csc_para_t csc_para = {0};
 
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        return;
+    }
+
    //put csc para to output_info_t
 
     dpu_info("in handle csc \n");
@@ -2579,6 +2626,12 @@ static void handle_gamma(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_
 {
     //test gamma 
 
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        return;
+    }
+
     dpu_info("in handle gamma \n");
 
 }
@@ -2586,6 +2639,12 @@ static void handle_gamma(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_
 static void handle_hda(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
 {
     //How ?
+
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        dpu_info("de is not available\n");
+        return;
+    }
     dpu_info("in handle hda\n");
 }
 

@@ -739,13 +739,19 @@ struct base_adapter_t
 
 };
 
+#define TEST_DE             0x1
+#define TEST_DOS_ONLY       0x2
+#define TEST_DE_WITH_QT     0x4
+
 struct dpu_adapter_t
 {
 	struct base_adapter_t  base;
 	
 	struct dpu_crtc_caps_t crtc_caps;
-	u32 	num_output;
-	
+
+    u32     test_domain;   //TEST_DE, TEST_DOS_ONLY, TEST_DE_WITH_QT
+    
+    u32 	num_output;
 	u32 	support_device;
 	u32     active_output[CRTC_NUM];
 

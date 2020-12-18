@@ -220,85 +220,14 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
     ****/
 }
 
-
-
-void dm_init_surfaces(struct dpu_adapter_t *dpu_adapter)
-{
-    u32 i;
-
-    dpu_adapter->surface_manager.num = 0;
-
-    for (i = 0; i < MAX_SURFACE_NUM; i++)
-    {
-        //dpu_adapter->surface_manager.surfaces[i].valid = 0;
-        memset(&dpu_adapter->surface_manager.surfaces[i], 0, sizeof(dpu_adapter->surface_manager.surfaces[i]));
-    }
-
-}
-
-void dm_init_cached_cmd(struct dpu_adapter_t *dpu_adapter)
-{
-
-    struct mode_cmd_t *mode;
-    struct plane_cmd_t *plane;
-    struct device_cmd_t *device;
-
-    mode = &dpu_adapter->cached_cmd[MODE_CMD][0].mode_cmd;
-
-    dpu_adapter->cached_cmd[MODE_CMD][0].valid = 1;
-    mode->crtc_index = 0;
-    mode->output = PORT_0;
-
-    mode->src_xres = 1920;
-    mode->src_yres = 1080;
-
-    mode->dst_xres = 1920;
-    mode->dst_yres = 1080;
-
-    mode->rr = 6000;
-
-    mode->output_signal = RGB_SIGNAL;
-
-
-    plane = &dpu_adapter->cached_cmd[PLANE_CMD][0].plane_cmd;
-    dpu_adapter->cached_cmd[PLANE_CMD][0].valid = 1;
-
-    plane->crtc_index = 0;
-    plane->surface_index = 0;
-    plane->src_x = 0;
-    plane->src_y = 0;
-
-    plane->src_w = 1920;
-    plane->src_h = 1080;
-
-    plane->dst_x = 0;
-    plane->dst_y = 0;
-    plane->dst_w = 1920;
-    plane->dst_h = 1080;
-    plane->plane_type = PRIMARY_PLANE;
-    plane->disable_plane = 0;
-
-    //plane->overlay_info_valid = 0;
-    plane->overlay_cmd.k_valid = 0;
-    plane->overlay_cmd.m_valid = 0;
-
-    device = &dpu_adapter->cached_cmd[DEVICE_CMD][0].device_cmd;
-    dpu_adapter->cached_cmd[DEVICE_CMD][0].valid = 1;
-
-
-    //TODO: need check later
-    device->bit_depth = 8;
-    device->async_clk = 1;
-    device->cea = 0;
-    device->coef = 1;
-    device->color_format = 0;
-    device->lane_count = 4;
-    device->link_rate = 1;
-    device->disable = 0;
-}
-
 void init_dm(struct dpu_adapter_t *dpu_adapter)
 {
+
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        return;
+    }
+
     dm_init_sw(dpu_adapter);
 
     dm_init_hw(dpu_adapter);
@@ -308,18 +237,14 @@ void init_dm(struct dpu_adapter_t *dpu_adapter)
     dm_init_plane(dpu_adapter);
 
     dm_init_output(dpu_adapter);
-
-    dm_init_surfaces(dpu_adapter);
-
-    dm_init_cached_cmd(dpu_adapter);
-
-
-    dpu_adapter->width_alignment = 64;   //surface width is 256bit aligment   cursor need 512bit aligment ?
-    dpu_adapter->offset_alignment = 0x8000; // 
 }
 
 
-void deinit_dm()
+void deinit_dm(struct dpu_adapter_t *dpu_adapter)
 {
+    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    {
+        return;
+    }
     //All sw state ?
 }
