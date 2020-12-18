@@ -3,7 +3,7 @@
 
 #include"config.h"
 #include"list.h"
-
+#include "dpu.h"
 
 #define     STR(s)     #s
 #define     ARRAY_SIZE(A)   (sizeof(A)/sizeof(A[0]))
@@ -199,7 +199,8 @@ struct crtc_info_t
     u8      index;
 
     u32     output;
-    struct mode_info_t    hw_mode, adjust_mode;
+    struct dpu_display_mode_t hw_mode;
+    struct dpu_display_mode_t adjust_mode;
 };
 
 typedef enum _PLANE_TYPE_
@@ -409,8 +410,8 @@ struct output_info_t
     u32   device;
     u8    edid[256];
 
-    u32   num_modes;
-    struct mode_info_t *modes;
+    struct dpu_display_mode_list_t mode_list;
+
     struct crtc_info_t *crtc;
 
 
@@ -742,9 +743,8 @@ struct dpu_adapter_t
 {
 	struct base_adapter_t  base;
 	
-	u32   	num_crtc;
+	struct dpu_crtc_caps_t crtc_caps;
 	u32 	num_output;
-	u32     num_plane[CRTC_NUM];
 	
 	u32 	support_device;
 	u32     active_output[CRTC_NUM];

@@ -80,7 +80,7 @@ struct format_info_t g_format_info[FORMAT_NUM] = {
         {32, "YCBCR2101010_32"},//FORMAT_YCBCR2101010_32
 };
 
-void temp_print(int level, char *string, ...)
+void temp_print(int level, char *string)
 {
     va_list args;
     u8 buff[LOG_BUFFER_SIZE];
@@ -90,16 +90,19 @@ void temp_print(int level, char *string, ...)
     {
         return ;
     }
-
 #endif
-    memset(buff, 0, LOG_BUFFER_SIZE);
 
-    va_start(args, string);
-    vsnprintf(buff, LOG_BUFFER_SIZE -1, string, args);
-    va_end(args);
+    //memset(buff, 0, LOG_BUFFER_SIZE);
 
+    //va_start(args, string);
+    //vsnprintf(buff, LOG_BUFFER_SIZE -1, string, args);
+    //va_end(args);
+
+#ifdef OUTPUT_UART
     bios_print(buff);
-
+#else
+    printf("%s", string);
+#endif
 }
 
 void tt_print(char * string, ...)

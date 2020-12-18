@@ -7,7 +7,7 @@
 #include"util.h"
 #include"config.h"
 
-#include"dpu/dpu.h"
+#include"dpu.h"
 
 
 //must sync with OUTPUT_SIGNAL
@@ -239,10 +239,10 @@ static void mode_handle_info(struct dpu_adapter_t *dpu_adapter)
             dpu_info("crtc_%d: output 0x%5x, hw mode(%4d %4d) adjust mode(%4d %4d), rr %d, output_signal %s\n",
                     i,
                     crtc_info->output,
-                    crtc_info->hw_mode.x_res,
-                    crtc_info->hw_mode.y_res,
-                    crtc_info->adjust_mode.x_res,
-                    crtc_info->adjust_mode.y_res,
+                    crtc_info->hw_mode.hactive,
+                    crtc_info->hw_mode.vactive,
+                    crtc_info->adjust_mode.hactive,
+                    crtc_info->adjust_mode.vactive,
                     crtc_info->hw_mode.refresh_rate,
                     g_output_signal_string[crtc_info->hw_mode.output_signal]);
         };
@@ -260,16 +260,14 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
     struct  crtc_info_t crtc_set = {0};
     u32 index = 0;
 
-    CBiosSettingModeParams  mode_para = {0};
+    struct dpu_crtc_mode_set_para_t crtc_mode = {0};
+    struct dpu_encoder_mode_set_para_t encoder_mode = {0};
 
     u32     new_cmd = 0;
 
     u32     valid = 0;
     u32     temp = 0;
     TT_STATUS ret = TT_PASS;
-
-
-
 
     mode_handle_trace(mode_info);
 
@@ -382,47 +380,38 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
     //update current mode 
     crtc_info = &dpu_adapter->current_crtc_info[prepare_cmd.crtc_index];
     crtc_info->output = prepare_cmd.output;
-    crtc_info->hw_mode.x_res = prepare_cmd.src_xres;
-    crtc_info->hw_mode.y_res = prepare_cmd.src_yres;
-    crtc_info->hw_mode.x_res = prepare_cmd.dst_xres;
-    crtc_info->hw_mode.y_res = prepare_cmd.dst_yres;
+    crtc_info->hw_mode.hactive = prepare_cmd.src_xres;
+    crtc_info->hw_mode.vactive = prepare_cmd.src_yres;
+    crtc_info->hw_mode.hactive = prepare_cmd.dst_xres;
+    crtc_info->hw_mode.vactive = prepare_cmd.dst_yres;
     crtc_info->hw_mode.refresh_rate = prepare_cmd.rr;
     crtc_info->hw_mode.output_signal = prepare_cmd.output_signal;
 
-    crtc_info->adjust_mode.x_res = prepare_cmd.dst_xres;
-    crtc_info->adjust_mode.y_res = prepare_cmd.dst_yres;
+    crtc_info->adjust_mode.hactive = prepare_cmd.dst_xres;
+    crtc_info->adjust_mode.vactive = prepare_cmd.dst_yres;
 
-
-    mode_para.SourcModeParams.XRes = prepare_cmd.src_xres;
-    mode_para.SourcModeParams.YRes = prepare_cmd.src_yres;
-    mode_para.DestModeParams.XRes = prepare_cmd.dst_xres;
-    mode_para.DestModeParams.YRes = prepare_cmd.dst_yres;
-
-    mode_para.DestModeParams.OutputSignal = prepare_cmd.output_signal;
-    mode_para.DestModeParams.RefreshRate = prepare_cmd.rr;
-
-    mode_para.ScalerSizeParams.XRes = prepare_cmd.dst_xres;
-    mode_para.ScalerSizeParams.YRes = prepare_cmd.dst_yres;
-
+    memcpy(&crtc_mode.hw_mode, &crtc_info->hw_mode, sizeof(struct dpu_display_mode_t));
+    memcpy(&crtc_mode.adjust_mode, &crtc_info->adjust_mode, sizeof(struct dpu_display_mode_t));
+    crtc_mode.crtc = prepare_cmd.crtc_index;
     
-    mode_para.IGAIndex = prepare_cmd.crtc_index;
-    mode_para.BitPerComponent = 8;
-   // mode_para.SkipIgaMode =  0;
-   // mode_para.SkipDeviceMode = 0;
+    crtc_mode.hw_mode.output_signal = prepare_cmd.output_signal;
 
-    CBiosSetIgaScreenOnOffState(dpu_adapter->dpu_manager, FALSE, mode_para.IGAIndex);
-    CBiosSetDisplayDevicePowerState(dpu_adapter->dpu_manager, prepare_cmd.output, CBIOS_PM_OFF);
+    crtc_mode.hw_mode.bpc = 8;
 
-    if (CBIOS_OK != CBiosSetModeToIGA(dpu_adapter->dpu_manager, &mode_para))
-    {
-        dpu_error("set mode : Calling pfnCBiosSetModeToIGA fails\n");
-        ret = TT_FAIL;
-    }
+    encoder_mode.crtc = prepare_cmd.crtc_index;
+    encoder_mode.encoder = prepare_cmd.crtc_index;
+    encoder_mode.conn = prepare_cmd.output;
 
+    dpu_encoder_dpms(dpu_adapter->dpu_manager, prepare_cmd.crtc_index, DPU_POWER_OFF);
+    dpu_crtc_dpms(dpu_adapter->dpu_manager, prepare_cmd.crtc_index, DPU_POWER_OFF);
+
+    dpu_crtc_mode_set(dpu_adapter->dpu_manager, &crtc_mode);
+    dpu_encoder_mode_set(dpu_adapter->dpu_manager, &encoder_mode);
     
 
-    CBiosSetDisplayDevicePowerState(dpu_adapter->dpu_manager, prepare_cmd.output, CBIOS_PM_ON);
-    CBiosSetIgaScreenOnOffState(dpu_adapter->dpu_manager, TRUE, mode_para.IGAIndex);
+    dpu_crtc_dpms(dpu_adapter->dpu_manager, prepare_cmd.crtc_index, DPU_POWER_OFF);
+    dpu_encoder_dpms(dpu_adapter->dpu_manager, prepare_cmd.crtc_index, DPU_POWER_OFF);
+
 
     //dpu_info("tt_get_bit_index(prepare_cmd.output) - 1 is %d\n",tt_get_bit_index(prepare_cmd.output) - 1);
 
@@ -672,7 +661,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
     u32 need_page_flip = 1;
     i32 i = 0, j = 0;
 
-
+/***
     CBIOS_SURFACE_ATTRIB  stream_attr = {0};
     CBIOS_WINDOW_PARA  src_win = {0};
     CBIOS_WINDOW_PARA  dst_win = {0};
@@ -1123,10 +1112,10 @@ end:
 
     ret = TT_PASS;
 
-
 end:
     return ret;
     #endif
+***/
 }
 
 
@@ -1544,7 +1533,7 @@ static void device_handle_info(struct dpu_adapter_t *dpu_adapter)
             dpu_info("crtc %d --- output 0x%x num_modes is %d, lr %d lc %d async_clck %d, enhanced_frame_mode %d\n",
                 output->crtc->index,
                 output->device,
-                output->num_modes,
+                output->mode_list.num,
                 output->link_rate,
                 output->lane_count,
                 output->async_clk,
@@ -1601,15 +1590,15 @@ static void print_mode_list(struct dpu_adapter_t *dpu_adapter, u32 output)
     {
         if (output == dpu_adapter->current_output_info[i].device)
         {
-            dpu_info("mode num of 0x%x is %d \n",output,dpu_adapter->current_output_info[i].num_modes);
+            dpu_info("mode num of 0x%x is %d \n",output,dpu_adapter->current_output_info[i].mode_list.num);
 
-            for (j = 0; j < dpu_adapter->current_output_info[i].num_modes; j++)
+            for (j = 0; j < dpu_adapter->current_output_info[i].mode_list.num; j++)
             {
                 dpu_info("%d: %d x %d @ %d\n",
                     j,
-                    dpu_adapter->current_output_info[i].modes[j].XRes,
-                    dpu_adapter->current_output_info[i].modes[j].YRes,
-                    dpu_adapter->current_output_info[i].modes[j].RefreshRate);
+                    dpu_adapter->current_output_info[i].mode_list.modes[j].hactive,
+                    dpu_adapter->current_output_info[i].mode_list.modes[j].vactive,
+                    dpu_adapter->current_output_info[i].mode_list.modes[j].refresh_rate);
             }
         }
     }
@@ -2314,7 +2303,7 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
     u8 value = 0, temp = 0, old = 0, sum = 0;
     u8 get_offset = 0, get_value = 0;
     u32 i = 0, j = 0;
-
+/***
     struct dpu_i2c_para_t i2c_para = {0};
 
     if (word_num < 3)
@@ -2411,7 +2400,8 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
                 offset, 
                 value);
         }
-    }   
+    }
+***/
 }
 
 static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
@@ -2840,7 +2830,8 @@ void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
                 dpu_info("%c", KEY_BACKSPACE);
             }
         }
-        else if (ch == KEY_ESC)  //clear all cmd_line
+        else if (ch == KEY_ESC)
+  //clear all cmd_line
         {
             i = position - cmd_line;
 

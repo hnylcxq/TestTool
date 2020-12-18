@@ -91,8 +91,8 @@ void main(int argc, char** argv)
 {
 	u32 run_on_qt = 0 ;
 	struct dpu_adapter_t *p;
-    TT_STATUS ret = TT_PASS;
-	
+	TT_STATUS ret = TT_PASS;
+
 	run_on_qt = 0;
 	if (argc == 2)
 	{
@@ -102,7 +102,7 @@ void main(int argc, char** argv)
 		}
 	}
 	
-    bios_helper_init();
+	bios_helper_init();
 
 	p = init_adapter(run_on_qt);
 	if (!p)
@@ -122,7 +122,7 @@ void main(int argc, char** argv)
 
     init_dm(p);
 
-   	init_video_memory(p);
+    init_video_memory(p);
 
     process_cmd(p);
 
@@ -131,5 +131,5 @@ void main(int argc, char** argv)
 
 end:
 	deinit_adapter();
-	
+	return;
 }

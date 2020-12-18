@@ -36,7 +36,7 @@
 #define WARNING_LEVEL  2
 #define DEBUG_LEVEL    3
 
-#define OUTPUT_UART
+//#define OUTPUT_UART
 
 #ifdef OUTPUT_UART
 
@@ -76,7 +76,7 @@ typedef enum _TT_CACHE_FLAG
 
 
 void tt_print(char * string, ...);
-void temp_print(int level, char *string, ...);
+void temp_print(int level, char *string);
 
 
 u32 tt_strhash(u8 *str);
