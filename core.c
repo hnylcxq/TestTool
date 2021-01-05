@@ -1124,11 +1124,10 @@ end:
     }
 
     ret = TT_PASS;
-
+#endif
+***/
 end:
     return ret;
-    #endif
-***/
 }
 
 

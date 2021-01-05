@@ -223,7 +223,7 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
 void init_dm(struct dpu_adapter_t *dpu_adapter)
 {
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         return;
     }
@@ -242,7 +242,7 @@ void init_dm(struct dpu_adapter_t *dpu_adapter)
 
 void deinit_dm(struct dpu_adapter_t *dpu_adapter)
 {
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         return;
     }

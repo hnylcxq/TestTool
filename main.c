@@ -228,9 +228,11 @@ void main(int argc, char** argv)
 
     test_domain = handle_param(argc, argv);
 
-    run_on_qt = test_domain | TEST_DE_WITH_QT;
+    run_on_qt = test_domain & TEST_DE_WITH_QT;
 
+#ifdef OUTPUT_UART
 	bios_helper_init();
+#endif
 
 	p = init_adapter(run_on_qt);
 	if (!p)
@@ -245,7 +247,7 @@ void main(int argc, char** argv)
     if (ret == TT_FAIL)
     {
         dpu_error("init card info faild ");
-        goto end;
+        //goto end;//we use DOS box to test pure software logic, comment here temperary, restore it after board ready
     }
 
     dpu_info("mmio base is 0x%x   fb base is 0x%x  size 0x%x\n", p->base.mmio_base, p->base.fb_base, p->base.fb_size);
