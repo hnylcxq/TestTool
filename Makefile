@@ -21,7 +21,8 @@ OBJ_DPU_CHIP_A += chip_a.obj
 OBJ_DPU_HDMI += hdmi.obj
 OBJ_DPU_HDMI += hdmi_phy.obj
 
-OBJ_DPU_AUDIO += audio.obj
+OBJ_DPU_AUDIO += codec.obj
+OBJ_DPU_AUDIO += hda.obj
 
 OBJ_DPU_EDID += edid.obj
 OBJ_DPU_DDC += i2c.obj
