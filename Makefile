@@ -27,10 +27,10 @@ OBJ_DPU_EDID += edid.obj
 OBJ_DPU_DDC += i2c.obj
 OBJ_DPU_MODE += mode.obj
 
-#OBJ_DPU_DP += aux_engine.obj
-#OBJ_DPU_DP += dp.obj
-#OBJ_DPU_DP += dp_phy.obj
-#OBJ_DPU_DP += encoder_dp.obj
+OBJ_DPU_DP += aux_engine.obj
+OBJ_DPU_DP += dp.obj
+OBJ_DPU_DP += dp_phy.obj
+OBJ_DPU_DP += encoder_dp.obj
 
 CC=wcc386
 LINK=link
@@ -44,8 +44,8 @@ WLINK_OPT=debug all sys dos32a op q
 
 ALL_OBJ= $(OBJ_TEST_TOOL)  $(OBJ_DPU) $(OBJ_DPU_COMMON) $(OBJ_DPU_CHIP_A) \
 		$(OBJ_DPU_HDMI) $(OBJ_DPU_AUDIO) $(OBJ_DPU_EDID) \
-		$(OBJ_DPU_DDC) $(OBJ_DPU_MODE)
-#		$(OBJ_DPU_DP)
+		$(OBJ_DPU_DDC) $(OBJ_DPU_MODE) \
+		$(OBJ_DPU_DP)
     
 
 ALL:    TestTool.exe
@@ -95,6 +95,6 @@ $(OBJ_DPU_MODE)
 	@$(CC) $(CC_OPT) $(DE_PATH)\modules\mode\$*.c
     @echo $*.c
 
-#$(OBJ_DPU_DP)
-#	@$(CC) $(CC_OPT) $(DE_PATH)\darren\$*.c
-#    @echo $*.c
+$(OBJ_DPU_DP)
+	@$(CC) $(CC_OPT) $(DE_PATH)\dp\$*.c
+    @echo $*.c
