@@ -16,6 +16,12 @@ OBJ_DPU += de_util.obj
 
 OBJ_DPU_COMMON += common.obj
 OBJ_DPU_COMMON += hw_util.obj
+OBJ_DPU_COMMON += pipe.obj
+OBJ_DPU_COMMON += plane.obj
+OBJ_DPU_COMMON += mdi.obj
+OBJ_DPU_COMMON += int.obj
+#OBJ_DPU_COMMON += pwm.obj
+
 OBJ_DPU_CHIP_A += chip_a.obj
 
 OBJ_DPU_HDMI += hdmi.obj
@@ -33,6 +39,8 @@ OBJ_DPU_DP += dp.obj
 OBJ_DPU_DP += dp_phy.obj
 OBJ_DPU_DP += encoder_dp.obj
 
+OBJ_DPU_DVO += dvo.obj
+
 CC=wcc386
 LINK=link
 WLINK=wlink
@@ -46,7 +54,7 @@ WLINK_OPT=debug all sys dos32a op q
 ALL_OBJ= $(OBJ_TEST_TOOL)  $(OBJ_DPU) $(OBJ_DPU_COMMON) $(OBJ_DPU_CHIP_A) \
 		$(OBJ_DPU_HDMI) $(OBJ_DPU_AUDIO) $(OBJ_DPU_EDID) \
 		$(OBJ_DPU_DDC) $(OBJ_DPU_MODE) \
-		$(OBJ_DPU_DP)
+		$(OBJ_DPU_DP) $(OBJ_DPU_DVO)
     
 
 ALL:    TestTool.exe
@@ -99,3 +107,8 @@ $(OBJ_DPU_MODE)
 $(OBJ_DPU_DP)
 	@$(CC) $(CC_OPT) $(DE_PATH)\dp\$*.c
     @echo $*.c
+
+$(OBJ_DPU_DVO)
+	@$(CC) $(CC_OPT) $(DE_PATH)\dvo\$*.c
+    @echo $*.c
+	
