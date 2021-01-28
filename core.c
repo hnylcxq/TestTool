@@ -9,6 +9,8 @@
 
 #include"dpu.h"
 
+#include "reg/reg.h"
+
 
 //must sync with OUTPUT_SIGNAL
 static u8  *g_output_signal_string[] = {" INVALID"," RGB"," YUV444", " YUV422", "YUV420"};
@@ -2732,6 +2734,10 @@ static TT_STATUS misc_handle(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_
     else if (is_same_str("hda", buffer[0]))
     {
         handle_hda(dpu_adapter, buffer, word_num);
+    }
+    else if (is_same_str("reg", buffer[0]))
+    {
+        handle_reg_main(dpu_adapter, buffer, word_num);
     }
     else
     {

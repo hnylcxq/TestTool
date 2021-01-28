@@ -20,7 +20,7 @@
 
 #define MAX_CACHED_CMD_NUM      5
 
-#define MAX_CMD_OPTION_NAME_SIZE  20
+#define MAX_CMD_OPTION_NAME_SIZE  100
 
 #define MAX_CMD_STRING_NUM      512
 #define MAX_INPUT_HISTORY_NUM      10

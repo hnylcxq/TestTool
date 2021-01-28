@@ -41,6 +41,32 @@ OBJ_DPU_DP += encoder_dp.obj
 
 OBJ_DPU_DVO += dvo.obj
 
+OBJ_REG_INFO = codec_reg_field_info.obj \
+			codec2_reg_field_info.obj \
+			cr_reg_field_info.obj \
+			cr_share_reg_field_info.obj \
+			cr2_reg_field_info.obj \
+			cr3_reg_field_info.obj \
+			dp_reg_field_info.obj \
+			dvo_reg_field_info.obj \
+			hda_reg_field_info.obj \
+			hdmi_reg_field_info.obj \
+			intg_reg_field_info.obj \
+			itg_reg_field_info.obj \
+			itg_share_reg_field_info.obj \
+			itg2_reg_field_info.obj \
+			itg3_reg_field_info.obj \
+			mdi_reg_field_info.obj \
+			pipe_reg_field_info.obj \
+			pipe2_reg_field_info.obj \
+			pipe3_reg_field_info.obj \
+			pwm_reg_field_info.obj \
+			sr_reg_field_info.obj \
+			sr2_reg_field_info.obj \
+			sr3_reg_field_info.obj
+
+OBJ_REG = reg.obj
+
 CC=wcc386
 LINK=link
 WLINK=wlink
@@ -54,7 +80,7 @@ WLINK_OPT=debug all sys dos32a op q
 ALL_OBJ= $(OBJ_TEST_TOOL)  $(OBJ_DPU) $(OBJ_DPU_COMMON) $(OBJ_DPU_CHIP_A) \
 		$(OBJ_DPU_HDMI) $(OBJ_DPU_AUDIO) $(OBJ_DPU_EDID) \
 		$(OBJ_DPU_DDC) $(OBJ_DPU_MODE) \
-		$(OBJ_DPU_DP) $(OBJ_DPU_DVO)
+		$(OBJ_DPU_DP) $(OBJ_DPU_DVO) $(OBJ_REG_INFO) $(OBJ_REG)
     
 
 ALL:    TestTool.exe
@@ -110,5 +136,13 @@ $(OBJ_DPU_DP)
 
 $(OBJ_DPU_DVO)
 	@$(CC) $(CC_OPT) $(DE_PATH)\dvo\$*.c
+    @echo $*.c
+	
+$(OBJ_REG_INFO)
+	@$(CC) $(CC_OPT) reg\reg_info\$*.c
+    @echo $*.c
+
+$(OBJ_REG)
+	@$(CC) $(CC_OPT) reg\$*.c
     @echo $*.c
 	
