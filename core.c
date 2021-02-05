@@ -9,8 +9,6 @@
 
 #include"dpu.h"
 
-#include "reg/reg.h"
-
 
 //must sync with OUTPUT_SIGNAL
 static u8  *g_output_signal_string[] = {" INVALID"," RGB"," YUV444", " YUV422", "YUV420"};
@@ -86,11 +84,12 @@ static struct options_table mode_options_table[] =
     {"src", "[-src xres yres]", 2, {{10, &g_mode_cmd.src_xres}, {10, &g_mode_cmd.src_yres},}},
     {"dst", "[-dst xres yres]", 2, {{10, &g_mode_cmd.dst_xres}, {10, &g_mode_cmd.dst_yres},}},
     {"rr",  "[-rr refresh rate eg:50]", 1, {{10, &g_mode_cmd.rr},}},
-    {"os",  "[-os output signal] 1:RGB 2: YUV444 3: YUV422 4: YUV 420",1, {{10, &g_mode_cmd.output_signal}},},
+    {"os",  "[-os output signal] 0x1:RGB 0x2: YUV444 0x4: YUV422 0x8: YUV 420",1, {{16, &g_mode_cmd.output_signal}},},
     {"list",   "[-list] list cached modes", 0, {{0, NULL, &g_mode_cmd.list_cmd}}},
     {"info",   "[-info] current mode info ", 0,{{0, NULL, &g_mode_cmd.info_cmd}}},
     {"help",   "[-help] help", 0, {{0, NULL, &g_mode_cmd.help_cmd},}},
     {"set",   "[-set index], set cached cmd[index]", 1, {{10, &g_mode_cmd.cmd_index, &g_mode_cmd.cmd_valid},}},
+    {"bpc", "[-bpc value], set color depth", 1, {{10, &g_mode_cmd.bpc,},}}
 };
 
 static struct options_table plane_options_table[] = 
@@ -144,9 +143,10 @@ static struct options_table device_options_table[] =
     {"coef","[-coef value], 1:ITU601 2:ITU709",1,{10, &g_device_cmd.coef,},},
     {"ml", "[-ml] list device mode list",0,{0, NULL, &g_device_cmd.modelist_cmd},},
     {"list","[-list] list cached device config",0,{0, NULL, &g_device_cmd.list_cmd},},
-    {"info","[-info] current device config",0, {0, NULL, &g_device_cmd.info_cmd}},
+    {"config","[-config] current device config",0, {0, NULL, &g_device_cmd.config_cmd}},
     {"help","[-help] list help info",0,{0, NULL, &g_device_cmd.help_cmd}},
-    {"set", "[-set index] set cached cmd[index]", 1, {10, &g_device_cmd.cmd_index, &g_device_cmd.cmd_valid},}
+    {"set", "[-set index] set cached cmd[index]", 1, {10, &g_device_cmd.cmd_index, &g_device_cmd.cmd_valid},},
+    {"info", "[-info] print display info", 0, {0, NULL, &g_device_cmd.info_cmd},},
 };
 
 static struct options_table cursor_options_table[] =
@@ -164,6 +164,27 @@ static struct options_table cursor_options_table[] =
 
 };
 
+static bool_t match_mode(struct dpu_display_mode_list_t *mode_list, struct dpu_display_mode_t *mode_get, int x, int y, int rr)
+{
+	int  i = 0;
+	struct dpu_display_mode_t *mode;
+
+	for (i = 0; i < mode_list->num; i++) {
+		mode = &mode_list->modes[i];
+
+		if (mode->hactive != x)
+			continue;
+		if (mode->vactive != y)
+			continue;
+		if (mode->refresh_rate != rr)
+			continue;
+
+		memcpy(mode_get, mode, sizeof(struct dpu_display_mode_t));
+		return TRUE;
+	}
+
+	return FALSE;
+}
 
 static void mode_handle_trace(struct mode_cmd_t *mode_info)
 {
@@ -204,8 +225,8 @@ static void mode_handle_list(struct dpu_adapter_t *dpu_adapter)
                     cached_cmd->dst_xres,
                     cached_cmd->dst_yres,
                     cached_cmd->rr,
-                    g_output_signal_string[cached_cmd->output_signal]);     
-            }
+                    g_output_signal_string[cached_cmd->output_signal]);
+        }
     }
 }
 
@@ -258,8 +279,9 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
     i32     i = 0;
     struct mode_cmd_t *cached_cmd;
     struct mode_cmd_t  prepare_cmd = {0};
-    struct  crtc_info_t *crtc_info;
-    struct  crtc_info_t crtc_set = {0};
+    struct crtc_info_t *crtc_info;
+    struct crtc_info_t crtc_set = {0};
+	struct output_info_t *output_info;
     u32 index = 0;
 
     struct dpu_crtc_mode_set_para_t crtc_mode = {0};
@@ -273,7 +295,7 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
 
     mode_handle_trace(mode_info);
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         goto end;
@@ -299,15 +321,15 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
 
     prepare_cmd.cmd_index = 0;
     prepare_cmd.crtc_index = 0;
-    prepare_cmd.output = 0x8000;
+    prepare_cmd.output = DPU_PORT_0;
+
     prepare_cmd.src_xres = 1920;
     prepare_cmd.src_yres = 1080;
     prepare_cmd.dst_xres = 1920;
     prepare_cmd.dst_yres = 1080;
-
-    prepare_cmd.rr = 6000;
-    prepare_cmd.output_signal = RGB_SIGNAL;
-    
+    prepare_cmd.rr = 60;
+    prepare_cmd.output_signal = DPU_RGB_SIGNAL;
+    prepare_cmd.bpc = 8;
 
     new_cmd = 1;
     if(mode_info->cmd_valid && mode_info->cmd_index < MAX_CACHED_CMD_NUM && dpu_adapter->cached_cmd[MODE_CMD][mode_info->cmd_index].valid)
@@ -333,30 +355,67 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
     if (mode_info->rr)
     {
         prepare_cmd.rr = mode_info->rr;
-        if (prepare_cmd.rr < 100)
-        {
-            prepare_cmd.rr *= 100;
-        }
+        //if (prepare_cmd.rr < 100)
+        //{
+        //    prepare_cmd.rr *= 100;
+        //}
     }
 
-    if (mode_info->output_signal && mode_info->output_signal < MAX_SIGNAL_NAM)
+	if (mode_info->bpc)
+		prepare_cmd.bpc  = mode_info->bpc;
+
+	if (mode_info->output & dpu_adapter->support_device)
+	{
+		prepare_cmd.output = tt_get_last_bit(mode_info->output & dpu_adapter->support_device);
+	}
+
+	if (mode_info->crtc_valid)
+	{
+		prepare_cmd.crtc_index = mode_info->crtc_index;
+	}
+
+    if (mode_info->output_signal)
     {
         prepare_cmd.output_signal = mode_info->output_signal;
     }
- 
 
-    if (mode_info->output & dpu_adapter->support_device)
-    {
-        prepare_cmd.output = tt_get_last_bit(mode_info->output & dpu_adapter->support_device);   
-    }
+	if (prepare_cmd.crtc_index >= DPU_MAX_CRTC_NUM)
+	{
+		dpu_info("invalid crtc %d", prepare_cmd.crtc_index);
+		goto end;
+	}
 
-   
+	if (!(prepare_cmd.output & dpu_adapter->support_device))
+	{
+		dpu_info("invalid devive 0x%x\n", prepare_cmd.output);
+		goto end;
+	}
 
-    if ((mode_info->crtc_valid)&& (mode_info->crtc_index < CRTC_NUM))
-    {
-        prepare_cmd.crtc_index = mode_info->crtc_index;
-    }
+	output_info = &dpu_adapter->current_output_info[tt_get_last_bit(prepare_cmd.output)];
+	crtc_info = &dpu_adapter->current_crtc_info[prepare_cmd.crtc_index];
 
+	if (!(prepare_cmd.output_signal & output_info->display_caps.support_signal.output_signal))
+	{
+		dpu_info("invalid output signal\n");
+		goto end;
+	}
+
+	if (!(prepare_cmd.bpc > output_info->display_caps.max_color_depth))
+	{
+		dpu_info("bpc %d out of range\n", prepare_cmd.bpc);
+		goto end;
+	}
+
+	if (!match_mode(&output_info->mode_list, &crtc_info->hw_mode, prepare_cmd.src_xres, prepare_cmd.src_yres, prepare_cmd.rr))
+	{
+		dpu_info("can't match hw mode\n");
+		goto end;
+	}
+	if (!match_mode(&output_info->mode_list, &crtc_info->adjust_mode, prepare_cmd.dst_xres, prepare_cmd.dst_yres, prepare_cmd.rr))
+	{
+		dpu_info("can't match adjust mode\n");
+		goto end;
+	}
 
     //check is new cmd or not
     for (i = 0 ;i < MAX_CACHED_CMD_NUM; i++)
@@ -383,69 +442,50 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
         dpu_adapter->cached_cmd[MODE_CMD][prepare_cmd.cmd_index].valid = 1;
     }
 
-
-
     //update current mode 
-    crtc_info = &dpu_adapter->current_crtc_info[prepare_cmd.crtc_index];
     crtc_info->output = prepare_cmd.output;
-    crtc_info->hw_mode.hactive = prepare_cmd.src_xres;
-    crtc_info->hw_mode.vactive = prepare_cmd.src_yres;
-    crtc_info->hw_mode.hactive = prepare_cmd.dst_xres;
-    crtc_info->hw_mode.vactive = prepare_cmd.dst_yres;
-    crtc_info->hw_mode.refresh_rate = prepare_cmd.rr;
-    crtc_info->hw_mode.output_signal = prepare_cmd.output_signal;
-
-    crtc_info->adjust_mode.hactive = prepare_cmd.dst_xres;
-    crtc_info->adjust_mode.vactive = prepare_cmd.dst_yres;
-
     memcpy(&crtc_mode.hw_mode, &crtc_info->hw_mode, sizeof(struct dpu_display_mode_t));
     memcpy(&crtc_mode.adjust_mode, &crtc_info->adjust_mode, sizeof(struct dpu_display_mode_t));
     crtc_mode.crtc = prepare_cmd.crtc_index;
-    
+
     crtc_mode.hw_mode.output_signal = prepare_cmd.output_signal;
 
-    crtc_mode.hw_mode.bpc = 8;
+    crtc_mode.hw_mode.bpc = prepare_cmd.bpc;
 
     encoder_mode.crtc = prepare_cmd.crtc_index;
-    encoder_mode.encoder = prepare_cmd.crtc_index;
-    encoder_mode.conn = prepare_cmd.output;
+    encoder_mode.conn = dpu_get_connector_from_port(dpu_adapter->dpu_manager, prepare_cmd.output);
+    encoder_mode.encoder = dpu_get_best_encoder(dpu_adapter->dpu_manager, encoder_mode.conn);
 
-    dpu_encoder_dpms(dpu_adapter->dpu_manager, prepare_cmd.crtc_index, DPU_POWER_OFF);
-    dpu_crtc_dpms(dpu_adapter->dpu_manager, prepare_cmd.crtc_index, DPU_POWER_OFF);
+	dpu_handle_display_topology(dpu_adapter->dpu_manager, &encoder_mode);
+
+    dpu_encoder_dpms(dpu_adapter->dpu_manager, encoder_mode.encoder, DPU_POWER_OFF);
+    dpu_crtc_dpms(dpu_adapter->dpu_manager, encoder_mode.crtc, DPU_POWER_OFF);
 
     dpu_crtc_mode_set(dpu_adapter->dpu_manager, &crtc_mode);
     dpu_encoder_mode_set(dpu_adapter->dpu_manager, &encoder_mode);
-    
 
-    dpu_crtc_dpms(dpu_adapter->dpu_manager, prepare_cmd.crtc_index, DPU_POWER_OFF);
-    dpu_encoder_dpms(dpu_adapter->dpu_manager, prepare_cmd.crtc_index, DPU_POWER_OFF);
+    dpu_crtc_dpms(dpu_adapter->dpu_manager, encoder_mode.crtc, DPU_POWER_OFF);
+    dpu_encoder_dpms(dpu_adapter->dpu_manager, encoder_mode.encoder, DPU_POWER_OFF);
 
-
-    //dpu_info("tt_get_bit_index(prepare_cmd.output) - 1 is %d\n",tt_get_bit_index(prepare_cmd.output) - 1);
-
-//TODO need get correct index here 
-    if (prepare_cmd.output & 0x1)
+    if (prepare_cmd.output & DPU_PORT_0)
     {
         index = 0;
     }
-    else if (prepare_cmd.output & 0x8000)
+    else if (prepare_cmd.output & DPU_PORT_1)
     {
         index = 1;
     }
-    else if (prepare_cmd.output & 0x10000)
+    else if (prepare_cmd.output & DPU_PORT_2)
     {
         index = 2;
     }
 
-     
     dpu_adapter->current_output_info[index].power_status = POWER_ON;
     dpu_adapter->current_output_info[index].crtc = &dpu_adapter->current_crtc_info[prepare_cmd.crtc_index];
 
 end:
     return ret;
 }
-
-
 
 static void plane_handle_trace(struct plane_cmd_t *plane_cmd)
 {
@@ -663,7 +703,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
     struct plane_cmd_t *cached_cmd = NULL;
     struct plane_cmd_t prepare_cmd = {0};
     struct plane_info_t *plane_info = NULL;
-//    struct dpu_plane_t plane_set ={0};
+    struct dpu_plane_update_para_t plane_set ={0};
     struct surface_info_t *surface = NULL;
     u32 new_cmd = 1;
     u32 need_page_flip = 1;
@@ -671,21 +711,12 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
 
     plane_handle_trace(plane_cmd);
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         goto end;
     }
 
-/***
-    CBIOS_SURFACE_ATTRIB  stream_attr = {0};
-    CBIOS_WINDOW_PARA  src_win = {0};
-    CBIOS_WINDOW_PARA  dst_win = {0};
-    CBIOS_OVERLAY_INFO   overlay = {0};
-    CBIOS_STREAM_PARA   stream_para = {0};
-    CBIOS_UPDATE_FRAME_PARA  update_frame = {0};
-
- 
     if (plane_cmd->list_cmd)
     {
         plane_handle_list(dpu_adapter);
@@ -874,101 +905,69 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
         //plane_info.plane_state = prepare_cmd.disable_plane;
         plane_info->surface = surface;
 
+        plane_set.crtc_index = prepare_cmd.crtc_index;
 
-
-        update_frame.Size = sizeof(update_frame);
-        update_frame.IGAIndex = prepare_cmd.crtc_index;
-
-        if (prepare_cmd.plane_type == CBIOS_STREAM_PS)
+        if (prepare_cmd.plane_type <= DPU_CURSOR_PLANE)
         {
-            update_frame.pPStreamPara= &stream_para;
+            plane_set.plane_type = prepare_cmd.plane_type;
         }
-        else if (prepare_cmd.plane_type == CBIOS_STREAM_SS)
-        {
-            update_frame.pSStreamPara= &stream_para;
-        }
-        else 
-        {
-            update_frame.pTStreamPara= &stream_para;
-        }
-            
-
-        stream_para.StreamType = prepare_cmd.plane_type;
 
         if (plane_info->plane_state == PLANE_ENABLED)
         {
             if (prepare_cmd.disable_plane)
             {
-                stream_para.FlipMode = CBIOS_STREAM_FLIP_WITH_DISABLE;
+                plane_set.flag = DPU_DISABLE_FLIP;
             }
             else
             {
-                stream_para.FlipMode = CBIOS_STREAM_FLIP_ONLY;
+                plane_set.flag = DPU_PAGE_FLIP;
             }
         }
         else
         {
             if (prepare_cmd.disable_plane)
             {
-                stream_para.FlipMode = CBIOS_STREAM_FLIP_WITH_DISABLE;
+                plane_set.flag = DPU_ENABLE_FLIP;
             }
             else
             {
-                stream_para.FlipMode= CBIOS_STREAM_FLIP_WITH_ENABLE;
+                plane_set.flag = DPU_PAGE_FLIP;
             }
+
         }
 
-        stream_para.pSurfaceAttrib = &stream_attr;
-        stream_para.pSrcWindowPara = &src_win;
-        stream_para.pWindowPara = &dst_win;
+		plane_set.base.surface.addr = (plane_set.flag != DPU_DISABLE_FLIP) ? surface->gpu_addr : 0x12345680;
 
-        if (stream_para.FlipMode != CBIOS_STREAM_FLIP_WITH_DISABLE)
-        {
-            stream_attr.StartAddr = surface->gpu_addr;
-        }
-        else
-        {
-            stream_attr.StartAddr = 0x12345680;
-        }
-
-        stream_attr.SurfaceFmt = surface->format;
-        stream_attr.SurfaceWidth = surface->width;
-        stream_attr.SurfaceHeight = surface->height;
-        stream_attr.BitCount = surface->bit_cnt;
+        plane_set.base.surface.format = surface->format;
+        plane_set.base.surface.width = surface->width;
+        plane_set.base.surface.height = surface->height;
+        plane_set.base.surface.bit_cnt = surface->bit_cnt;
   
-        stream_attr.Pitch = surface->pitch;
-        stream_attr.bCompress =  0;
-        stream_attr.bTiled = 0;
+        plane_set.base.surface.pitch = surface->pitch;
+        plane_set.base.surface.compressed =  0;
 
-        src_win.PositionX = prepare_cmd.src_x ;
-        src_win.PositionY = prepare_cmd.src_y ;
-        src_win.WinSizeX = prepare_cmd.src_w;
-        src_win.WinSizeY = prepare_cmd.src_h;
+        plane_set.base.src_x = prepare_cmd.src_x ;
+        plane_set.base.src_y = prepare_cmd.src_y ;
+        plane_set.base.src_w = prepare_cmd.src_w;
+        plane_set.base.src_h = prepare_cmd.src_h;
 
-        dst_win.PositionX = prepare_cmd.dst_x;
-        dst_win.PositionY = prepare_cmd.dst_y;
+        plane_set.base.dst_x = prepare_cmd.dst_x;
+        plane_set.base.dst_y = prepare_cmd.dst_y;
+        plane_set.base.dst_w = prepare_cmd.dst_w;
+        plane_set.base.dst_h = prepare_cmd.dst_h;
 
-        dst_win.WinSizeX = prepare_cmd.dst_w;
-        dst_win.WinSizeY = prepare_cmd.dst_h;
-
-        if(stream_para.StreamType != CBIOS_STREAM_PS)
+        if(plane_cmd->plane_type != DPU_PRIMARY_PLANE)
         {
-            stream_para.pOverlayInfo = &overlay;
-            overlay.KeyMode = CBIOS_WINDOW_KEY;
-            overlay.WindowKey.Kp_Kmix= 0;
-            overlay.WindowKey.Ks_Kt = 8;
+        	plane_set.base.overlay.mode = DPU_SOP_WINDOW_KEY;
+            plane_set.base.overlay.kp = 0;
+            plane_set.base.overlay.ks = 8;
         }
 
         plane_info->plane_state = prepare_cmd.disable_plane;
 
-        ret =  (CBiosUpdateFrame(dpu_adapter->dpu_manager, &update_frame) == CBIOS_OK) ? TT_PASS : TT_FAIL;
+        ret =  (dpu_plane_update(dpu_adapter->dpu_manager, &plane_set) == DPU_OK) ? TT_PASS : TT_FAIL;
     }
 
-end:
-    return ret;
-
-
-        
 #if 0
         //get page flip info
         plane_set.crtc = prepare_cmd.crtc_index;
@@ -1127,7 +1126,6 @@ end:
 
     ret = TT_PASS;
 #endif
-***/
 end:
     return ret;
 }
@@ -1524,13 +1522,13 @@ static void device_handle_info(struct dpu_adapter_t *dpu_adapter)
 {
     u32 i = 0;
     struct output_info_t *output = NULL;
-    
+
     dpu_info("support device 0x%x \n", dpu_adapter->support_device);
 
     for (i = 0; i < PORT_NUM; i++)
     {
         output = &dpu_adapter->current_output_info[i];
-        if (output->connect_status == DISCONNECTED_STATUS)
+        if (output->connect_status == DISCONNECTED)
         {
             dpu_info("output 0x%x disconnected\n",output->device);
             continue;
@@ -1599,6 +1597,7 @@ static void device_handle_list(struct dpu_adapter_t *dpu_adapter)
 static void print_mode_list(struct dpu_adapter_t *dpu_adapter, u32 output)
 {
     u32 i = 0,j = 0;
+	struct dpu_display_mode_t *mode;
 
     for (i = 0; i < PORT_NUM; i++)
     {
@@ -1608,15 +1607,105 @@ static void print_mode_list(struct dpu_adapter_t *dpu_adapter, u32 output)
 
             for (j = 0; j < dpu_adapter->current_output_info[i].mode_list.num; j++)
             {
+            	mode = &dpu_adapter->current_output_info[i].mode_list.modes[j];
                 dpu_info("%d: %d x %d @ %d\n",
                     j,
-                    dpu_adapter->current_output_info[i].mode_list.modes[j].hactive,
-                    dpu_adapter->current_output_info[i].mode_list.modes[j].vactive,
-                    dpu_adapter->current_output_info[i].mode_list.modes[j].refresh_rate);
+                    mode->hactive,
+                    mode->vactive,
+                    mode->refresh_rate);
             }
+			break;
         }
     }
 }
+
+void print_display_info(struct dpu_adapter_t *dpu_adapter, u32 output)
+{
+    u32 i = 0,j = 0;
+	struct output_info_t *output_info;
+	struct dpu_display_info_t *display_info;;
+
+    for (i = 0; i < PORT_NUM; i++)
+    {
+        if (output == dpu_adapter->current_output_info[i].device)
+        {
+			output_info = &dpu_adapter->current_output_info[i];
+			display_info = &output_info->display_caps;
+
+			if (display_info->monitor_type == MONITOR_TYPE_HDMI) {
+				dpu_info("hdmi: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
+					display_info->horizontal_cm, display_info->vertical_cm);
+				dpu_info("rgb color depth support: %s %s %s %s %s\n", 
+					display_info->hdmi_caps.rgb_dc.dc_6 ? "6 bit" : "",
+					display_info->hdmi_caps.rgb_dc.dc_10 ? "10 bit" : "",
+					display_info->hdmi_caps.rgb_dc.dc_12 ? "12 bit" : "",
+					display_info->hdmi_caps.rgb_dc.dc_14 ? "14 bit" : "",
+					display_info->hdmi_caps.rgb_dc.dc_16 ? "16 bit" : "");
+					dpu_info("ycbcr444 color depth support: %s %s %s %s %s %s\n", 
+					display_info->hdmi_caps.ycbcr444_dc.dc_6 ? "6 bit" : "",
+					display_info->hdmi_caps.ycbcr444_dc.dc_10 ? "10 bit" : "",
+					display_info->hdmi_caps.ycbcr444_dc.dc_12 ? "12 bit" : "",
+					display_info->hdmi_caps.ycbcr444_dc.dc_14 ? "14 bit" : "",
+					display_info->hdmi_caps.ycbcr444_dc.dc_16 ? "16 bit" : "");
+					dpu_info("ycbcr420 color depth support: %s %s %s %s %s %s\n", 
+					display_info->hdmi_caps.ycbcr420_dc.dc_6 ? "6 bit" : "",
+					display_info->hdmi_caps.ycbcr420_dc.dc_10 ? "10 bit" : "",
+					display_info->hdmi_caps.ycbcr420_dc.dc_12 ? "12 bit" : "",
+					display_info->hdmi_caps.ycbcr420_dc.dc_14 ? "14 bit" : "",
+					display_info->hdmi_caps.ycbcr420_dc.dc_16 ? "16 bit" : "");
+				dpu_info("scramble support: %s\n", display_info->hdmi_caps.scramble ? "YES" : "NO");
+				dpu_info("scdc support: %s\n", display_info->hdmi_caps.scdc_support ? "YES" : "NO");
+				dpu_info("read request support: %s\n", display_info->hdmi_caps.read_request ? "YES" : "NO");
+				
+			}else if (display_info->monitor_type == MONITOR_TYPE_DVI) {
+				dpu_info("dvi: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
+					display_info->horizontal_cm, display_info->vertical_cm);
+			} else if (display_info->monitor_type == MONITOR_TYPE_DP) {
+				dpu_info("dp: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
+					display_info->horizontal_cm, display_info->vertical_cm);
+				dpu_info("max link rate %d\n", display_info->dp_caps.max_link_rate);
+				dpu_info("max link cnt %d\n", display_info->dp_caps.max_link_cnt);
+			} else if (display_info->monitor_type == MONITOR_TYPE_EDP) {
+				dpu_info("backlight support: %s\n", display_info->panel_caps.backlight_support ? "YES" : "NO");
+				if (display_info->panel_caps.backlight_support) {
+					dpu_info("range: [%d - %d]\n", display_info->panel_caps.min_bl_level,
+						display_info->panel_caps.max_bl_level);
+				}
+			}
+
+			dpu_info("max color depth %d\n", display_info->max_color_depth);
+			dpu_info("max tmds clock %d\n", display_info->max_tmds_clk);
+			dpu_info("output signal support: %s %s %s\n",
+				display_info->support_signal.rgb ? "RGB" : "",
+				display_info->support_signal.ycbcr444 ? "YCBCR444" : "",
+				display_info->support_signal.ycbcr422 ? "YCBCR422" : "");
+			dpu_info("hdr support: %s\n", display_info->hdr_caps.hdr_support ? "YES" : "NO");
+			if (display_info->hdr_caps.hdr_support) {
+				dpu_info("colorimetry support %s %s %s\n",
+					display_info->hdr_caps.colorimetry.BT2020CYCC ? "BT2020 C YCC" : "",
+					display_info->hdr_caps.colorimetry.BT2020YCC ? "BT2020 YCC" : "",
+					display_info->hdr_caps.colorimetry.BT2020RGB ? "BT2020 RGB" : "");
+				dpu_info("eotf(gamma): %s %s %s %s", 
+					display_info->hdr_caps.static_hdr.SMPT_2084 ? "SMPT 2084" : "",
+					display_info->hdr_caps.static_hdr.HLG_gamma ? "HLG" : "");
+				dpu_info("luminance: [%d - %d] avr: %d\n",
+					display_info->hdr_caps.static_hdr.desired_min_luminance,
+					display_info->hdr_caps.static_hdr.desired_max_luminance,
+					display_info->hdr_caps.static_hdr.desired_max_average_luminance);
+			}
+			dpu_info("dynamic range support: %s\n", display_info->monitor_range.support ? "YES" : "NO");
+			if (display_info->monitor_range.support)
+				dpu_info("%d - %d Hz\n", display_info->monitor_range.min_vrate, display_info->monitor_range.max_vrate);
+
+			dpu_info("audio support: %s\n", display_info->audio_support ? "YES ": "NO");
+
+			
+			break;
+        }
+    }
+}
+
+
 //Éè¼ÆÒ»¸ö×¨ÃÅµÄdpu º¯ÊýÀ´×ödevice ²ÎÊýµÄ´«µÝ£¬ ºÍdevice on off ²¢ÁÐ´æÔÚ£ ×öcts  test ?
 static TT_STATUS device_handle(struct dpu_adapter_t *dpu_adapter, struct device_cmd_t *device_cmd)
 {
@@ -1624,7 +1713,7 @@ static TT_STATUS device_handle(struct dpu_adapter_t *dpu_adapter, struct device_
     u32 new_cmd = 1;
     u32 need_set_device = 1;
 
- //   struct dpu_device_set_t  device_set = {0};
+    struct dpu_device_set_t  device_set = {0};
     i32 i = 0;
 
     struct device_cmd_t prepare_cmd = {0};
@@ -1632,13 +1721,13 @@ static TT_STATUS device_handle(struct dpu_adapter_t *dpu_adapter, struct device_
 
     device_handle_trace(device_cmd);
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         goto end;
     }
 
-    if (device_cmd->info_cmd)
+    if (device_cmd->config_cmd)
     {
         device_handle_info(dpu_adapter);
         goto end;
@@ -1662,15 +1751,21 @@ static TT_STATUS device_handle(struct dpu_adapter_t *dpu_adapter, struct device_
         goto end;
     }
 
+	if (device_cmd->info_cmd)
+	{
+		print_display_info(dpu_adapter, device_cmd->output);
+		goto end;
+	}
+
     if (device_cmd->disable)
     {
         if (device_cmd->output & ((1 << PORT_NUM) - 1))
         {
-         //   device_set.device = tt_get_last_bit(device_cmd->output);
-         //   device_set.state = DPU_POWER_OFF;
-          //  dpu_set_device(dpu_adapter->dpu_manager, &device_set);
+            device_set.device = tt_get_last_bit(device_cmd->output);
+            //device_set.state = DPU_POWER_OFF;
+            dpu_set_device(dpu_adapter->dpu_manager, &device_set);
 
-       //     dpu_adapter->current_output_info[device_set.device].power_status = POWER_OFF;
+            dpu_adapter->current_output_info[device_set.device].power_status = POWER_OFF;
         }
         else
         {
@@ -1882,7 +1977,7 @@ static TT_STATUS cursor_handle(struct dpu_adapter_t *dpu_adapter, struct cursor_
 
     cursor_handle_trace(cursor_cmd);
     
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         goto end;
@@ -2325,21 +2420,20 @@ static void handle_dump(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
 
 static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
 {
-    u8 group = 0;
+    u8 device = 0;
     u8 addr = 0;
     u32 offset = 0;
     u8 value = 0, temp = 0, old = 0, sum = 0;
     u8 get_offset = 0, get_value = 0;
     u32 i = 0, j = 0;
+    struct dpu_i2c_para_t i2c_para = {0};
 
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         return;
     }
-/***
-    struct dpu_i2c_para_t i2c_para = {0};
 
     if (word_num < 3)
     {
@@ -2347,7 +2441,8 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         return ;
     }
 
-    group = strtoul(buffer[1], NULL, 16);
+    device = dpu_get_connector_from_port(dpu_adapter->dpu_manager, strtoul(buffer[1], NULL, 16));
+
     addr = strtoul(buffer[2], NULL, 16);
     if (word_num >= 4)
     {
@@ -2361,15 +2456,14 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         get_value = 1;
     }
 
-    i2c_para.group = group;
-    i2c_para.addr = addr;
-    i2c_para.buffer = &temp;
+    i2c_para.slave_addr = addr;
+    i2c_para.data = &temp;
     i2c_para.length = 1;
     i2c_para.offset = 0;
 
     if (!get_value) //i2c read 
     {
-        i2c_para.op = 0;
+        i2c_para.rw = 0;
         if (!get_offset)
         {
             dpu_info("    00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n");
@@ -2379,7 +2473,7 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
                 for (j = 0; j < 16; j++)
                 {
                     i2c_para.offset = i * 16 + j;
-                    dpu_set_i2c(dpu_adapter->dpu_manager, &i2c_para);
+                    dpu_i2c_transfer(dpu_adapter->dpu_manager, device, &i2c_para);
 
                     dpu_info(" %02x", temp);
                     if (i < 8)
@@ -2395,33 +2489,33 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         {
             i2c_para.offset = offset;
             
-            dpu_set_i2c(dpu_adapter->dpu_manager, &i2c_para);
-            dpu_info("group 0x%x addr 0x%x offset 0x%x value :0x%x\n", group, addr, offset, temp);
+            dpu_i2c_transfer(dpu_adapter->dpu_manager, device, &i2c_para);
+            dpu_info("group 0x%x addr 0x%x offset 0x%x value :0x%x\n", device, addr, offset, temp);
         }
     }
     else //i2c write
     {
-        i2c_para.op = 0;
+        i2c_para.rw = 0;
         i2c_para.offset = offset;
-        i2c_para.buffer = &old;
+        i2c_para.data = &old;
         
-        dpu_set_i2c(dpu_adapter->dpu_manager, &i2c_para); 
+        dpu_i2c_transfer(dpu_adapter->dpu_manager, device, &i2c_para); 
         //dpu_info("grop 0x%x addr 0x%x offset 0x%x value :0x%x\n",group, addr, offset, temp);
 
-        i2c_para.op = 1;
-        i2c_para.buffer = &value;
+        i2c_para.rw = 1;
+        i2c_para.data = &value;
         
-        dpu_set_i2c(dpu_adapter->dpu_manager, &i2c_para);
+        dpu_i2c_transfer(dpu_adapter->dpu_manager, device, &i2c_para);
 
-        i2c_para.op = 0;
-        i2c_para.buffer = &temp;
+        i2c_para.rw = 0;
+        i2c_para.data = &temp;
    
-        dpu_set_i2c(dpu_adapter->dpu_manager, &i2c_para);
+        dpu_i2c_transfer(dpu_adapter->dpu_manager, device, &i2c_para);
 
         if (temp != value)
         {
-            dpu_info("write group 0x%x addr 0x%x offset 0x%x failed,old value is 0x%x now value is 0x%x\n",
-                group,
+            dpu_info("write device 0x%x addr 0x%x offset 0x%x failed,old value is 0x%x now value is 0x%x\n",
+                device,
                 addr,
                 offset,
                 old,
@@ -2429,14 +2523,13 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         }
         else
         {
-            dpu_info("write group 0x%x addr 0x%x offset 0x%x  value 0x%x successfully\n",
-                group, 
+            dpu_info("write device 0x%x addr 0x%x offset 0x%x  value 0x%x successfully\n",
+                device, 
                 addr, 
                 offset, 
                 value);
         }
     }
-***/
 }
 
 static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
@@ -2448,7 +2541,7 @@ static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
     u8  get_value = 0;
 
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         return;
@@ -2611,7 +2704,7 @@ static void handle_csc(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 {
    struct csc_para_t csc_para = {0};
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         return;
@@ -2627,7 +2720,7 @@ static void handle_gamma(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_
 {
     //test gamma 
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         return;
@@ -2641,7 +2734,7 @@ static void handle_hda(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 {
     //How ?
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         dpu_info("de is not available\n");
         return;
@@ -2734,10 +2827,6 @@ static TT_STATUS misc_handle(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_
     else if (is_same_str("hda", buffer[0]))
     {
         handle_hda(dpu_adapter, buffer, word_num);
-    }
-    else if (is_same_str("reg", buffer[0]))
-    {
-        handle_reg_main(dpu_adapter, buffer, word_num);
     }
     else
     {

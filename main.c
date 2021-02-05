@@ -122,7 +122,7 @@ void init_cached_cmd(struct dpu_adapter_t *dpu_adapter)
 
     mode->rr = 6000;
 
-    mode->output_signal = RGB_SIGNAL;
+    mode->output_signal = DPU_RGB_SIGNAL;
 
 
     plane = &dpu_adapter->cached_cmd[PLANE_CMD][0].plane_cmd;
@@ -165,7 +165,7 @@ void init_cached_cmd(struct dpu_adapter_t *dpu_adapter)
 void init_card(struct dpu_adapter_t *dpu_adapter)
 {
 
-    if (dpu_adapter->test_domain | TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
     {
         return;
     }

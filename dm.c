@@ -89,10 +89,8 @@ i32 dm_init_sw(struct dpu_adapter_t *dpu_adapter)
     sw_init_para.dpu_cb.cb_vsprintf                  = (void*)vsprintf;
     sw_init_para.dpu_cb.cb_vsnprintf                 = (void*)vsnprintf;
 
-    dpu_info("dpu_adapter is %p\n",dpu_adapter);
-
     sw_init_para.chip_revision          = dpu_adapter->base.revision_id;
-    sw_init_para.device_id             = 0x1d17;//dpu_adapter->base.device_id;
+    sw_init_para.device_id             = 0x5348;//dpu_adapter->base.device_id;
     sw_init_para.vender_id            = dpu_adapter->base.vender_id;
     sw_init_para.is_mamm_primary = dpu_adapter->base.flags.is_primary; 
     //sw_init_para.GeneralChipID   = 0x3A04;
@@ -103,15 +101,22 @@ i32 dm_init_sw(struct dpu_adapter_t *dpu_adapter)
 
     dpu_adapter->dpu_manager = dpu_mgr_init(&sw_init_para);
 
-    if(dpu_adapter->dpu_manager)
-        dpu_info("init dpu manager success , dm is %p\n", dpu_adapter->dpu_manager);
-
     return 0;
+}
+
+void dm_deinit_sw(struct dpu_adapter_t *dpu_adapter)
+{
+	dpu_mgr_deinit(dpu_adapter->dpu_manager);
 }
 
 void dm_init_hw(struct dpu_adapter_t *dpu_adapter)
 {
     dpu_hw_init(dpu_adapter->dpu_manager);
+}
+
+void dm_deinit_hw(struct dpu_adapter_t *dpu_adapter)
+{
+	dpu_hw_deinit(dpu_adapter->dpu_manager);
 }
 
 void dm_init_crtc(struct dpu_adapter_t *dpu_adapter)
@@ -162,6 +167,7 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
     //CIP_ACTIVE_DEVICES                active_device = {0};
     u32 dwBufferSize = 0;
     u32 mode_num = 0;
+	struct output_info_t *output_info;
 
     dpu_adapter->support_device = DPU_PORT_0 | DPU_PORT_1 | DPU_PORT_2;
 
@@ -173,7 +179,7 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
     for (i = 0; i < PORT_NUM; i++)
     {
         memset(&dpu_adapter->current_output_info[i], 0 , sizeof(struct output_info_t));
-        dpu_adapter->current_output_info[i].connect_status = DISCONNECTED_STATUS;
+        dpu_adapter->current_output_info[i].connect_status = DISCONNECTED;
         dpu_adapter->current_output_info[i].power_status = POWER_OFF;
     }
 
@@ -181,10 +187,7 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
     devDetect.detect_device = dpu_adapter->support_device;
     devDetect.fake_device = DPU_PORT_0;
 
-    if(DPU_OK == dpu_detect_device(dpu_adapter->dpu_manager, &devDetect))
-    {
-        dpu_info("connect device is 0x%x\n", devDetect.connected_device);
-    }
+    DPU_OK == dpu_detect_device(dpu_adapter->dpu_manager, &devDetect);
 
     device = devDetect.connected_device;
     while (device)
@@ -193,31 +196,55 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
 
         device &= ~temp;
 
-        dpu_get_modes(dpu_adapter->dpu_manager, &dpu_adapter->current_output_info[i].mode_list, temp);
+		output_info = &dpu_adapter->current_output_info[tt_get_bit_index(temp)];
 
-        mode_num = dpu_adapter->current_output_info[i].mode_list.num;
-        dpu_adapter->current_output_info[i].mode_list.modes = 
+        dpu_get_modes(dpu_adapter->dpu_manager, &output_info->mode_list, temp);
+
+        mode_num = output_info->mode_list.num;
+
+		if (output_info->mode_list.modes != NULL)
+		{
+			free(output_info->mode_list.modes);
+			output_info->mode_list.modes = NULL;
+		}
+
+        output_info->mode_list.modes = 
             (struct dpu_display_mode_t*)malloc(mode_num * sizeof(struct dpu_display_mode_t));
-        memset(dpu_adapter->current_output_info[i].mode_list.modes, 0, 
-            mode_num * sizeof(struct dpu_display_mode_t));
-        dpu_get_modes(dpu_adapter->dpu_manager, &dpu_adapter->current_output_info[i].mode_list, temp);
 
-        dpu_adapter->current_output_info[i].device = temp;
+        memset(output_info->mode_list.modes, 0, mode_num * sizeof(struct dpu_display_mode_t));
+        dpu_get_modes(dpu_adapter->dpu_manager, &output_info->mode_list, temp);
+
+		output_info->display_caps.device = temp;
+		dpu_query_display_info(dpu_adapter->dpu_manager, &output_info->display_caps);
+
+        output_info->device = temp;
+		output_info->connect_status = CONNECTED;
     }
 
-    /***
-    dpu_adapter->active_output[0] = 0x8000 & devDetect.DetectedDevices;
-    dpu_adapter->active_output[1] = 0x10000 & devDetect.DetectedDevices;
-    dpu_adapter->active_output[2] = 0x1 & devDetect.DetectedDevices;
+	device = dpu_adapter->support_device;
+	while (device) {
+		temp = tt_get_last_bit(device);
+		device &= ~temp;
+		dpu_info("device 0x%x %s\n", temp, (devDetect.connected_device & temp) ? "connected" : "not detect");
+	}
+}
 
-    active_device.DeviceId[0] = dpu_adapter->active_output[0];
-    active_device.DeviceId[1] = dpu_adapter->active_output[1];
-    active_device.DeviceId[2] = dpu_adapter->active_output[2];
+void_t dm_deinit_output(struct dpu_adapter_t *dpu_adapter)
+{
+	int i;
+	struct output_info_t *output_info;
 
-    dpu_info("active is %d %d %d\n",active_device.DeviceId[0],active_device.DeviceId[1],active_device.DeviceId[2]);    
+	for (i = 0; i < PORT_NUM; i++)
+	{
+		output_info = &dpu_adapter->current_output_info[i];
 
-    CBiosSetActiveDevice(dpu_adapter->dpu_manager, &active_device);
-    ****/
+		if (output_info->mode_list.modes != NULL)
+		{
+			free(output_info->mode_list.modes);
+			output_info->mode_list.modes = NULL;
+		}
+	}
+
 }
 
 void init_dm(struct dpu_adapter_t *dpu_adapter)
@@ -242,9 +269,12 @@ void init_dm(struct dpu_adapter_t *dpu_adapter)
 
 void deinit_dm(struct dpu_adapter_t *dpu_adapter)
 {
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
-    {
-        return;
-    }
-    //All sw state ?
+	if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+	{
+		return;
+	}
+
+	dm_deinit_output(dpu_adapter);
+	dm_deinit_hw(dpu_adapter);
+	dm_deinit_sw(dpu_adapter);
 }

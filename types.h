@@ -155,19 +155,6 @@ typedef enum _CRTC_TYPE
     CRTC_NUM = 3,
 }CRTC_TYPE;
 
-
-typedef enum _OUTPUT_SIGNAL_
-{
-    INVALID_SIGNAL= 0,
-    RGB_SIGNAL,
-    YCBCR444_SIGNAL,
-    YCBCR422_SIGNAL,
-    YCBCR420_SIGNAL,
-    MAX_SIGNAL_NAM,
-}OUTPUT_SIGNAL;
-
-
-
 struct mode_info_t
 {
     u32  x_res;  //change to hdisplay later ?
@@ -191,7 +178,7 @@ struct mode_info_t
     u32  pixel_clock;
     u32  bit_per_commonent;
 
-    OUTPUT_SIGNAL  output_signal;
+    u32_t output_signal;
 };
 
 struct crtc_info_t
@@ -394,8 +381,8 @@ struct plane_info_t
 
 typedef enum _OUTPUT_CONNECTE_STATUS_T
 {
-    CONNECTED_STATUS = 0,
-    DISCONNECTED_STATUS,
+    CONNECTED = 0,
+    DISCONNECTED,
     UNKNOW_STATUS,
 }OUTPUT_CONNECT_STATUS;
 
@@ -411,7 +398,7 @@ struct output_info_t
     u8    edid[256];
 
     struct dpu_display_mode_list_t mode_list;
-
+	struct dpu_display_info_t display_caps;
     struct crtc_info_t *crtc;
 
 
@@ -542,19 +529,20 @@ struct mode_cmd_t
     u32  crtc_valid;
 
     u32  output;
+
+//add these in one structure
     u32  src_xres;
     u32  src_yres;
     u32  dst_xres;
     u32  dst_yres;
     u32  rr;
+    u32 output_signal;
+	u32 bpc;
 
 
     u32  list_cmd;
     u32  info_cmd;
     u32  help_cmd;
-
-    u32 output_signal; //OUTPUT_SIGNAL
-
 
     u32  cmd_index; // used for cached modes
     u32  cmd_valid;
@@ -628,9 +616,10 @@ struct device_cmd_t
 
 
     u32     modelist_cmd;
-    u32     info_cmd;
+    u32     config_cmd;
     u32     list_cmd;
     u32     help_cmd;
+	u32 info_cmd;
 
 
     
