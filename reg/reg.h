@@ -2,6 +2,7 @@
 #define __REG_H__
 
 #include "../config.h"
+#include "types.h"
 
 struct reg_field{
 	char * name;

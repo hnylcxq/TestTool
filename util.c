@@ -7,6 +7,12 @@
 
 #define LOG_BUFFER_SIZE     256
 
+
+struct platform_funcs_t   *platform_funcs = NULL;
+
+extern struct dpu_adapter_t  *g_dpu_adapter;
+
+
 u32 tt_strhash(u8 *str)
 {
     u32 i,l;
@@ -29,6 +35,19 @@ u32 tt_strhash(u8 *str)
     }
     return ret;
 } 
+
+
+BOOL tt_is_same_str(u8 *str1, u8 *str2)
+{
+    if (tt_strhash(str1) == tt_strhash(str2))
+    {
+        return TRUE;
+    }
+    else
+    {
+        return FALSE;
+    }
+}
 
 
 u32  tt_get_bit_index(u32 value)
@@ -59,6 +78,88 @@ u8 tt_get_bit_num(u32 value)
     return num;
 }
 
+TT_STATUS tt_get_words(u8* cmd_line, u32 *word_num, u8 str[][MAX_CMD_OPTION_NAME_SIZE])
+{
+    u32 i;
+	u8   *word;
+    u8   filter[] = " ,\t\n";
+	TT_STATUS ret = TT_PASS;
+
+	word = strtok(cmd_line, filter);
+	if(word != NULL)
+	{
+		strcpy(str[0], word);
+	}
+	else
+	{
+		*word_num = 0;
+		ret = TT_PASS;
+		goto end;
+	}
+
+	if (str[0][0] == 'q' || str[0][0] == 'Q')
+	{
+		ret = TT_FAIL;
+		goto end;
+	}
+
+	i = 1;
+	while(word != NULL)
+	{
+		word = strtok(NULL, filter);
+		if(word != NULL)
+		{
+			strcpy(str[i], word);
+			i++;
+		}
+	}
+	*word_num = i;
+
+end:
+	return ret;
+	
+}
+
+BOOL tt_is_comment(u8 words[][SCRIPT_MAX_WORD_SIZE])
+{
+    BOOL ret = FALSE;
+    
+    if (words[0][0] == '#')
+    {
+        ret = TRUE;
+    }
+
+    return ret;
+    
+}
+
+BOOL tt_is_end_with(const u8 *str1, u8 *str2)
+{
+	u32 len1 = strlen(str1);
+	u32 len2 = strlen(str2);
+
+    if(str1 == NULL || str2 == NULL)
+    {
+        return FALSE;
+    }
+	
+    if((len1 < len2) ||  (len1 == 0 || len2 == 0))
+	{
+		return FALSE;
+	}
+
+    while(len2 >= 1)
+    {
+        if(str2[len2 - 1] != str1[len1 - 1])
+        {
+			return FALSE;
+		}
+        len2--;
+        len1--;
+    }
+    return TRUE;
+}
+
 
 
 struct format_info_t g_format_info[FORMAT_NUM] = {
@@ -80,66 +181,51 @@ struct format_info_t g_format_info[FORMAT_NUM] = {
         {32, "YCBCR2101010_32"},//FORMAT_YCBCR2101010_32
 };
 
-void temp_print(int level, char *string)
-{
-    va_list args;
-    u8 buff[LOG_BUFFER_SIZE];
 
-#if 0
-    if (level  > g_dpu_adapter->log_level)
-    {
-        return ;
-    }
-#endif
+//used for de cb
 
-    //memset(buff, 0, LOG_BUFFER_SIZE);
-
-    //va_start(args, string);
-    //vsnprintf(buff, LOG_BUFFER_SIZE -1, string, args);
-    //va_end(args);
-
-#ifdef OUTPUT_UART
-    bios_print(buff);
-#else
-    printf("%s", string);
-#endif
-}
-
-void tt_print(char * string, ...)
+extern u32 g_output_uart;
+void dpu_info(int level, u8 *fmt, ...)
 {
 	va_list args;
 	u8 buff[LOG_BUFFER_SIZE];
-
-    #if 0
-	if (level  > g_dpu_adapter->log_level)
+	
+	if (level > g_dpu_adapter->log_level)
 	{
-		return ;
+		return;
 	}
 
-    #endif
-	memset(buff, 0, LOG_BUFFER_SIZE);
+	memset(buff, 0, LOG_BUFFER_SIZE);  
+	va_start(args, fmt);
+	vsnprintf(buff, LOG_BUFFER_SIZE -1, fmt, args); 
+	va_end(args); 
 	
-	va_start(args, string);
-	vsnprintf(buff, LOG_BUFFER_SIZE -1, string, args);
-	va_end(args);
-	
-	bios_print(buff);
+
+	if (g_output_uart)
+	{
+		platform_funcs->platform_print(buff);
+	}
+	else 
+	{
+		printf("%s", buff);
+		fflush(stdout);
+	}
 }
-
-
 
 void tt_get_system_time(u64 * time)
 {
-	bios_get_system_time(time);
+    platform_funcs->platform_get_system_time(time);
 }
 
 
 void tt_delay_micro_seconds(u32 value)
 {
-	bios_delay_micro_seconds(value);
+	platform_funcs->platform_delay_micro_seconds(value);
 }
 
 
+//need handle cache state ?
+#if 0
 TT_CACHE_FLAG tt_get_cache_state()
 {
 	u32 cache_state = 0;
@@ -165,331 +251,7 @@ void tt_set_cache(TT_CACHE_FLAG flag)
 	bios_set_cache_state(cache_state);
 }
 
-
-
-u8 tt_mmio_read_reg(
-    void*                   adapter,
-    u16                    type_index,
-    u32                   IGAEncoderIndex
-    )
-{
-    u8        byRet;
-    u32       mmioAddress;
-    u8        type = (u8) ((type_index&0xFF00) >> 8);
-    u8        index = (u8) (type_index&0x00FF);
-    u8        inType = type;
-
-    if(IGAEncoderIndex == 1)
-    {
-        if(type == CR)
-        {
-            inType = CR_B;
-        }
-        else if(type == SR)
-        {
-            inType = SR_B;
-        }
-    }
-    else if(IGAEncoderIndex == 2)
-    {
-        if(type == CR)
-        {
-            inType = CR_T;
-        }
-        else if(type == SR)
-        {
-            inType = SR_T;
-        }
-    }
-
-    if(IGAEncoderIndex == 7)
-    {
-        if(type == SR)
-        {
-            inType = SR_B;
-        }
-        else if(type == CR)
-        {
-            inType = CR_B;
-        }
-    }
-
-    switch(inType)
-    {
-    case MISC:
-        byRet = tt_read_u32(adapter, CB_MISC_OUTPUT_READ_REG);
-        break;
-    case CR:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_A_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case CR_B:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_B_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case CR_T:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_T +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case CR_C:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_C_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case CR_D:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case CR_D_0:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D0_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case CR_D_1:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D1_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break; 
-    case CR_D_2:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D2_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case CR_D_3:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D3_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case SR:
-        {
-            mmioAddress = MMIO_OFFSET_SR_GROUP_A_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-     case SR_B: 
-        {
-            mmioAddress = MMIO_OFFSET_SR_GROUP_B_ELT +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case SR_T: 
-        {
-            mmioAddress = MMIO_OFFSET_SR_GROUP_T +index;
-            byRet = tt_read_u8(adapter, mmioAddress);
-        }
-        break;
-    case AR:
-        {
-            tt_read_u8(adapter, CB_ATTR_INITIALIZE_REG);
-            tt_write_mmio_byte(adapter, CB_ATTR_ADDR_REG, index, 0);
-            byRet = tt_read_u8(adapter, CB_ATTR_DATA_READ_REG);
-        }
-        break;
-    case GR:
-        {
-            tt_write_mmio_byte(adapter, CB_GRAPH_ADDR_REG, index, 0);
-            byRet = tt_read_u8(adapter, CB_GRAPH_DATA_REG);
-        }
-        break;
-    default:
-        break;
-    }
-    return byRet;
-}
-
-void tt_mmio_write_reg(
-    void                    *adapter,
-    u16                    type_index,
-    u8                    value,
-    u8                    mask,
-    u32                   IGAEncoderIndex
-    )
-{
-    u8                byTemp;         //Temp value, also save register's old value
-    u32               mmioAddress;
-    u8                type = (u8) ((type_index&0xFF00) >> 8);
-    u8                index = (u8) (type_index&0x00FF);
-    u8                inType = type;
-
-    if(IGAEncoderIndex == 1)
-    {
-        if(type == CR)
-        {
-            inType = CR_B;
-        }
-        else if(type == SR)
-        {
-            inType = SR_B;
-        }
-    }
-    else if(IGAEncoderIndex == 2)
-    {
-        if(type == CR)
-        {
-            inType = CR_T;
-        }
-        else if(type == SR)
-        {
-            inType = SR_T;
-        }
-    }
-
-    if(IGAEncoderIndex == 7)
-    {
-        if(type == SR)
-        {
-            inType = SR_B;
-        }
-        else if(type == CR)
-        {
-            inType = CR_B;
-        }
-    }
-
-    switch(inType)
-    {
-    case MISC:
-        {
-            byTemp = tt_read_u8(adapter, CB_MISC_OUTPUT_READ_REG);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, CB_MISC_OUTPUT_READ_REG, byTemp, 0);
-        }
-        break;
-    case CR:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_A_ELT + index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case CR_B:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_B_ELT + index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case CR_T:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_T + index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case CR_C: 
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_C_ELT +index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case CR_D: 
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D_ELT +index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case CR_D_0:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D0_ELT + index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case CR_D_1:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D1_ELT + index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case CR_D_2:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D2_ELT +index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case CR_D_3:
-        {
-            mmioAddress = MMIO_OFFSET_CR_GROUP_D3_ELT +index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case SR:    //SR_A
-        {
-            mmioAddress = MMIO_OFFSET_SR_GROUP_A_ELT +index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case SR_B:  //HDTV2 registers
-        {
-            mmioAddress = MMIO_OFFSET_SR_GROUP_B_ELT +index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case SR_T:
-        {
-            mmioAddress = MMIO_OFFSET_SR_GROUP_T +index;
-            byTemp =  tt_read_u8(adapter, mmioAddress);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, mmioAddress, byTemp, 0);
-        }
-        break;
-    case AR:
-        {
-            tt_read_u8(adapter, CB_ATTR_INITIALIZE_REG);
-            tt_write_mmio_byte(adapter, CB_ATTR_ADDR_REG, index, 0);
-            byTemp = tt_read_u8(adapter, CB_ATTR_DATA_READ_REG);
-            byTemp = (byTemp & mask) | value;
-            tt_read_u8(adapter, CB_ATTR_INITIALIZE_REG);
-            tt_write_mmio_byte(adapter, CB_ATTR_ADDR_REG, index, 0);
-            tt_write_mmio_byte(adapter, CB_ATTR_DATA_WRITE_REG, byTemp, 0);
-        }
-        break;
-    case GR:
-        {
-            tt_write_mmio_byte(adapter, CB_GRAPH_ADDR_REG, index, 0);
-            byTemp = tt_read_u8(adapter, CB_GRAPH_DATA_REG);
-            byTemp = (byTemp & mask) | value;
-            tt_write_mmio_byte(adapter, CB_GRAPH_ADDR_REG, byTemp, 0);
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-
-
+#endif
 
 
 void tt_write_u8(void * adapter, u32 register_port, u8 value)
@@ -497,7 +259,7 @@ void tt_write_u8(void * adapter, u32 register_port, u8 value)
 	struct dpu_adapter_t * dpu_adapter = (struct dpu_adapter_t *)adapter;
 	volatile u8 * port = NULL;
 	
-	port = (u8 *)(dpu_adapter->base.mmio_base+ register_port);
+	port = (u8 *)((u8*)dpu_adapter->base.mmio_base+ register_port);
 	*port = value;
 }
 
@@ -508,10 +270,10 @@ void tt_write_u32(void * adapter, u32 register_port, u32 value)
 	volatile u32 * port = NULL;
 	u32 ul_align_mask = sizeof(u32) - 1;
 	
-	port = (u32 *)(dpu_adapter->base.mmio_base + register_port);
+	port = (u32 *)((u8*)dpu_adapter->base.mmio_base + register_port);
 	if ((u32)port & ul_align_mask)
 	{
-		dpu_error("The port address 0x%x is not aligned \n",register_port);
+		dpu_info(ERROR_LEVEL,"The port address 0x%x is not aligned \n",register_port);
 	}
 	*port = value;
 	
@@ -523,11 +285,12 @@ u32 tt_read_u32(void * adapter, u32 register_port)
 	volatile u32 * port = NULL;
 	u32  ul_align_mask = sizeof(u32) - 1;
 	u32  value = 0;
-	
-	port = (u32 *)(dpu_adapter->base.mmio_base + register_port);
+
+	//printf("dpu_adapter, 0x%x dpu_adapter->base.mmio_base is 0x%x 0x%x\n",dpu_adapter, dpu_adapter->base.mmio_base, register_port);
+	port = (u32 *)((u8*)dpu_adapter->base.mmio_base + register_port);
 	if ((u32)port & ul_align_mask)
 	{
-		dpu_error("The port address 0x%x is not aligned  %p mask 0x%x\n",register_port,port,ul_align_mask);
+		dpu_info(ERROR_LEVEL,"The port address 0x%x is not aligned  %p mask 0x%x\n",register_port,port,ul_align_mask);
 	}
 	
 	value = *port;
@@ -541,7 +304,7 @@ u8 tt_read_u8(void * adapter, u32 register_port)
 	volatile u8 * port = NULL;
 	u8 value = 0 ;
 	
-	port = (u8 *)(dpu_adapter->base.mmio_base + register_port);
+	port = (u8 *)((u8*)dpu_adapter->base.mmio_base + register_port);
 	
 	value = *port;
 	return value;
@@ -554,10 +317,10 @@ void tt_read_u16(void * adapter, u32 register_port)
 	u16 value;
 	u16  ul_align_mask = sizeof(u16) - 1;
 	
-	port = (u16 *)(dpu_adapter->base.mmio_base + register_port);
+	port = (u16 *)((u8*)dpu_adapter->base.mmio_base + register_port);
 	if ((u32)port & ul_align_mask)
 	{
-		dpu_error("The port address 0x%x is not aligned \n",register_port);
+		dpu_info(ERROR_LEVEL,"The port address 0x%x is not aligned \n",register_port);
 	}
 	value = *port;
 }
@@ -568,10 +331,10 @@ void tt_write_u16(void * adapter, u32 register_port, u16 value)
 	volatile u16 * port = NULL;
 	u32  ul_align_mask = sizeof(u16) - 1;
 	
-	port = (u16 *)(dpu_adapter->base.mmio_base + register_port);
+	port = (u16 *)((u8*)dpu_adapter->base.mmio_base + register_port);
 	if ((u16)port & ul_align_mask)
 	{
-		dpu_error("The port address 0x%x is not aligned \n",register_port);
+		dpu_info(ERROR_LEVEL,"The port address 0x%x is not aligned \n",register_port);
 	}
 	*port = value;
 }
@@ -583,7 +346,7 @@ u32 tt_read_buffer_u32(volatile u32 *register_port)
 	
 	if ((u32)register_port & ul_align_mask)
 	{
-		dpu_error("The mem address 0x%x is not aligned \n",register_port);
+		dpu_info(ERROR_LEVEL,"The mem address 0x%x is not aligned \n",register_port);
 	}
 	value = *register_port;
 	return value;
@@ -595,21 +358,32 @@ void tt_write_buffer_u32(volatile u32 * register_port, u32 value)
 	
 	if ((u32)register_port & ul_align_mask)
 	{
-		dpu_error("The mem address 0x%x is not aligned \n",register_port);
+		dpu_info(ERROR_LEVEL,"The mem address 0x%x is not aligned \n",register_port);
 	}
 	*register_port = value;
 }
 
 
-u8 tt_read_io(u8 * register_port)
+u8 tt_read_io_byte(u16 register_port)
 {
-	return bios_read_io(register_port);
+	return platform_funcs->platform_read_io_byte(register_port);
 }
 
-void tt_write_io(u8 * register_port, u8 value)
+void tt_write_io_byte(u16 register_port, u8 value)
 {
-	bios_write_io(register_port, value);
+	platform_funcs->platform_write_io_byte(register_port, value);
 }
+
+u32 tt_read_io_dword(u16 register_port)
+{
+	return platform_funcs->platform_read_io_dword(register_port);
+}
+
+void tt_write_io_dword(u16 register_port, u32 value)
+{
+	platform_funcs->platform_write_io_dword(register_port, value);
+}
+
 
 u8 tt_read_mmio_byte(u32 base, u32 port)
 {
@@ -652,7 +426,7 @@ void * tt_malloc_mem(u32 bytes)
 	
 	if (!p)
 	{
-		dpu_error(" malloc memory failed \n");
+		dpu_info(ERROR_LEVEL," malloc memory failed \n");
 	}
 	memset(p, 0, bytes);
 	return p;
@@ -666,8 +440,6 @@ void * tt_free_mem(void *p)
 	}
 }
 
-
-
 u32  tt_get_last_bit(u32  value)
 {
     u32  result = 0;
@@ -678,43 +450,73 @@ u32  tt_get_last_bit(u32  value)
     return result;
 }
 
+void tt_read_pci_config_byte(u8 bus, u8 dev, u8 func, u16 reg, u8* data)
+{
+    platform_funcs->platform_read_pci_config_byte(bus, dev, func, reg, data);
+}
 
+void tt_read_pci_config_word(u8 bus, u8 dev, u8 func, u16 reg, u16 *data)
+{
+	platform_funcs->platform_read_pci_config_word(bus, dev, func, reg, data);
+}
 
-static u32 get_fb_size(u32 bus, u32 dev, u32 func)
+void tt_read_pci_config_dword(u8 bus, u8 dev, u8 func, u16 reg, u32 *data)
+{
+	platform_funcs->platform_read_pci_config_dword(bus, dev, func, reg, data);
+}
+
+void tt_write_pci_config_byte(u8 bus, u8 dev, u8 func, u16 reg, u8 data)
+{
+    platform_funcs->platform_write_pci_config_byte(bus, dev, func, reg, data);
+}
+
+void tt_write_pci_config_word(u8 bus, u8 dev, u8 func, u16 reg, u16 data)
+{
+    platform_funcs->platform_write_pci_config_word(bus, dev, func, reg, data);
+}
+
+void tt_write_pci_config_dword(u8 bus, u8 dev, u8 func, u16 reg, u32 data)
+{
+    platform_funcs->platform_write_pci_config_dword(bus, dev, func, reg, data);
+}
+
+TT_STATUS tt_get_linear_addr(u64 phy_addr, u32 size, void **linear_addr)
+{
+	return platform_funcs->platform_get_linear_addr(phy_addr, size, linear_addr);
+}
+static u32 get_bar_size(u32 bus, u32 dev, u32 func,u32 fb)
 {
     u32 temp, value, size;
+	u32 offset = 0x10;
 
-    bios_read_pci_config_dword(bus, dev, func, 0x14, &temp);
+	if (fb == 1)
+	{
+		offset = 0x14;
+	}
+
+    tt_read_pci_config_dword(bus, dev, func, offset, &temp);
     value = temp;
-    bios_write_pci_config_dword(bus, dev, func, 0x14, 0xFFFFFFFF);
-    bios_read_pci_config_dword(bus, dev, func, 0x14, &temp);
+    tt_write_pci_config_dword(bus, dev, func, offset, 0xFFFFFFFF);
+    tt_read_pci_config_dword(bus, dev, func, offset, &temp);
 
     size = (~temp | 0xF) + 1;
-    bios_write_pci_config_dword(bus, dev, func, 0x14, value);
+    tt_write_pci_config_dword(bus, dev, func, offset, value);
 
     return size;
 
 }
 
-void tt_read_pci_config_byte(u8 bus, u8 dev, u8 func, u16 reg, u8* data)
-{
-    bios_read_pci_config_byte(bus,dev,func, reg, data);
-}
-
-void tt_write_pci_config_byte(u8 bus, u8 dev, u8 func, u16 reg, u8 data)
-{
-    bios_write_pci_config_byte(bus, dev, func, reg, data);
-}
 
 u32 tt_get_pci_info(struct base_adapter_t *base_adapter)
 {
 	u32 found = 0;
 	u32 bus, dev, func;
 	u32 data_out, data_in;
-    u8 i, j, k, bcid, scid, sbn;
-    u16 vendor_id, device_id;
-    u32 value, fb_size;
-	
+	u8 i, j, k, bcid, scid, sbn;
+	u16 vendor_id, device_id;
+	u32 value,size;
+	void* temp;
+
 	for (bus = 0; bus < PCI_MAX_BUS_NUM; ++bus)
 	{
 		for (dev = 0; dev < PCI_MAX_DEVICE_NUM; ++dev)
@@ -724,25 +526,25 @@ u32 tt_get_pci_info(struct base_adapter_t *base_adapter)
                 data_out = (bus << 16) + (dev << 11) + (func << 8);
                 data_out |= 0x80000000;
 
-                OUTPD(CONFIG_ADDRESS, data_out);
-                data_in = INPD(CONFIG_DATA);
+                tt_write_io_dword(CONFIG_ADDRESS, data_out);
+                data_in = tt_read_io_dword(CONFIG_DATA);
 
-                //dpu_info("data_in is 0x%x\n",data_in);
+                //dpu_info(INFO_LEVEL,"data_in is 0x%x\n",data_in);
 
                 if ((data_in & 0xFFFF) == VENDER_XX)
                 {
-                    OUTPD(CONFIG_ADDRESS, data_out + 0x8);
-                    if ((INPD(CONFIG_DATA) & 0xFF000000) == 0x03000000)
+                    tt_write_io_dword(CONFIG_ADDRESS, data_out + 0x8);
+                    if ((tt_read_io_dword(CONFIG_DATA) & 0xFF000000) == 0x03000000)
                     {
                         base_adapter->vender_id = (u16)(data_in & 0xFFFF);
                         base_adapter->device_id = (u16)((data_in & 0xFFFF0000)>>16);
-                        base_adapter->revision_id = (u16)(INPD(CONFIG_DATA) & 0xFF);
+                        base_adapter->revision_id = (u16)(tt_read_io_dword(CONFIG_DATA) & 0xFF);
                         base_adapter->bus_num= bus;
                         base_adapter->dev_num = dev;
                         base_adapter->func_num = func;
 
-                        OUTPD(CONFIG_ADDRESS, data_out + 4);
-                        if (INPD(CONFIG_DATA) & 0x01)
+                        tt_write_io_dword(CONFIG_ADDRESS, data_out + 4);
+                        if (tt_read_io_dword(CONFIG_DATA) & 0x01)
                         {
                             base_adapter->flags.is_primary = 1;
                         }
@@ -765,11 +567,10 @@ done_1:
 
     if (found == 0)
     {
-        dpu_info("couldn't found card \n");
+        dpu_info(INFO_LEVEL,"couldn't found card \n");
         return 0;
     }
 
-   // dpu_info("lei found card \n");
     
 	for (i = 0; i < PCI_MAX_BUS_NUM; ++i)
     {
@@ -777,21 +578,21 @@ done_1:
         {
             for (k = 0; k < PCI_MAX_FUNCTION_NUM; ++k)
             {
-                bios_read_pci_config_word(i, j, k, PCI_VENDOR_ID_OFFSET, &vendor_id);
+                tt_read_pci_config_word(i, j, k, PCI_VENDOR_ID_OFFSET, &vendor_id);
                 if (vendor_id == 0xFFFF)
                 {
                     continue;
                 }
-                bios_read_pci_config_word(i, j, k, PCI_DEVICE_ID_OFFSET, &device_id);
-                bios_read_pci_config_byte(i, j, k, PCI_CLASS_DEVICE_OFFSET, &scid);
-                bios_read_pci_config_byte(i, j, k, PCI_BASE_CLASEE_OFFEST, &bcid);
+                tt_read_pci_config_word(i, j, k, PCI_DEVICE_ID_OFFSET, &device_id);
+                tt_read_pci_config_byte(i, j, k, PCI_CLASS_DEVICE_OFFSET, &scid);
+                tt_read_pci_config_byte(i, j, k, PCI_BASE_CLASEE_OFFEST, &bcid);
 
                 if (scid != 0x04 || bcid != 0x06)
                 {
                     continue;
                 }
                 
-                bios_read_pci_config_byte(i, j, k, 0x19, &sbn);
+                tt_read_pci_config_byte(i, j, k, 0x19, &sbn);
 
                 if(sbn == base_adapter->bus_num)
                 {
@@ -806,33 +607,40 @@ done_1:
 	
 done_2:
     //bar0 info
-    bios_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0x10, &value);
-
+    tt_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0x10, &value);
+	size = get_bar_size(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0);
     value = value & ~0xf; //mask flag bit
-	if (bios_get_linear_addr(value, 0x80000, &value))
+	if (TT_PASS == tt_get_linear_addr((u64)value, size, &temp))
     {
-        base_adapter->mmio_base = value;
+        base_adapter->mmio_base = temp;
+		base_adapter->mmio_size = size;
+		base_adapter->mmio_phy = value;
+
+		dpu_info(INFO_LEVEL, "mmio phy_addr is 0x%x size 0x%x mmio vir_addr 0x%x\n", value, size, temp);
     }
     else
     {
         base_adapter->mmio_base = 0;
+		base_adapter->mmio_size = 0;
         found = 0;
         goto exit;
     }
 	
 	//bar1 info
 
-    bios_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0x14, &value);
-    fb_size = get_fb_size(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num);
+    tt_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0x14, &value);
+    size = get_bar_size(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 1);
 	value = value & ~0xF;
-    if (bios_get_linear_addr(value, fb_size, &value))
+    if (TT_PASS == tt_get_linear_addr((u64)value, size, &temp))
     {
-        base_adapter->fb_base = value;
-        base_adapter->fb_size = fb_size;
+        base_adapter->fb_base = temp;
+        base_adapter->fb_size = size;
+		base_adapter->fb_phy = value;
+		dpu_info(INFO_LEVEL, "fb   phy_addr is 0x%x size 0x%x fb   vir_addr 0x%x\n", value, size, temp);
     }
-		
+
 exit:	
-	
+
 	return found;
 	
 }
@@ -849,13 +657,13 @@ void tt_enable_pci_bridge(struct base_adapter_t *base_adapter)
     {
         do
         {
-            bios_read_pci_config_byte(base_adapter->bridge_info.bus_num, 
+            tt_read_pci_config_byte(base_adapter->bridge_info.bus_num, 
                 base_adapter->bridge_info.dev_num, base_adapter->bridge_info.func_num, PCI_COMMAND_OFFSET, &command);
 
             command |=0x07;
-            bios_write_pci_config_byte(base_adapter->bridge_info.bus_num,
+            tt_write_pci_config_byte(base_adapter->bridge_info.bus_num,
                 base_adapter->bridge_info.dev_num, base_adapter->bridge_info.func_num, PCI_COMMAND_OFFSET, command);
-            bios_read_pci_config_byte(base_adapter->bridge_info.bus_num, 
+            tt_read_pci_config_byte(base_adapter->bridge_info.bus_num, 
                 base_adapter->bridge_info.dev_num, base_adapter->bridge_info.func_num, PCI_COMMAND_OFFSET, &temp);
 
         }while (command != temp);
@@ -867,12 +675,12 @@ void tt_enable_mmio_access(struct base_adapter_t *base_adapter)
 {
     u8 command;
 
-    bios_read_pci_config_byte(base_adapter->bridge_info.bus_num, base_adapter->bridge_info.dev_num, base_adapter->bridge_info.func_num, PCI_COMMAND_OFFSET, &command);
+    tt_read_pci_config_byte(base_adapter->bridge_info.bus_num, base_adapter->bridge_info.dev_num, base_adapter->bridge_info.func_num, PCI_COMMAND_OFFSET, &command);
 
     if ((command & 0x02) == 0)
     {
         command = command | 0x02;
-        bios_write_pci_config_byte(base_adapter->bridge_info.bus_num,
+        tt_write_pci_config_byte(base_adapter->bridge_info.bus_num,
                                    base_adapter->bridge_info.dev_num,
                                    base_adapter->bridge_info.func_num,
                                    PCI_COMMAND_OFFSET,
@@ -925,7 +733,7 @@ struct surface_info_t* alloc_surface(struct dpu_adapter_t *dpu_adapter)
     if (dpu_adapter->surface_manager.num >= MAX_SURFACE_NUM)
     {
 
-        dpu_info("please increase macro MAX_SURFACE_NUM \n");
+        dpu_info(INFO_LEVEL,"please increase macro MAX_SURFACE_NUM \n");
         surface = NULL;
         return surface;
     }
@@ -941,7 +749,7 @@ struct surface_info_t* alloc_surface(struct dpu_adapter_t *dpu_adapter)
 
     if (i == MAX_SURFACE_NUM)
     {
-        dpu_error("Some wrong, please help check\n");
+        dpu_info(ERROR_LEVEL,"Some wrong, please help check\n");
         surface = NULL;
     }
     else
@@ -962,7 +770,7 @@ TT_STATUS free_surface(struct dpu_adapter_t *dpu_adapter, u32 index)
 
     if (index >= MAX_SURFACE_NUM || dpu_adapter->surface_manager.surfaces[index].valid == 0)
     {
-        dpu_error("%s:  invalid para \n",__func__);
+        dpu_info(ERROR_LEVEL,"%s:  invalid para \n",__func__);
         return TT_FAIL;
     }
 
@@ -996,9 +804,9 @@ TT_STATUS get_color_pixel(SURFACE_FORMAT format, u32 color, u32 *pixel_1, u32 *p
     CR = RGB2CR(R_CHANNEL(color)>>2, G_CHANNEL(color)>>2, B_CHANNEL(color)>>2);
 
 
-   // dpu_error("color is 0x%x, R 0x%x G 0x%x  B 0x%x \n",color,R_CHANNEL(color),G_CHANNEL(color),B_CHANNEL(color));
+   // dpu_info(ERROR_LEVEL,"color is 0x%x, R 0x%x G 0x%x  B 0x%x \n",color,R_CHANNEL(color),G_CHANNEL(color),B_CHANNEL(color));
     
-    //dpu_error("Y 0x%x CB 0x%x CR 0x%x \n",Y,CB,CR);
+    //dpu_info(ERROR_LEVEL,"Y 0x%x CB 0x%x CR 0x%x \n",Y,CB,CR);
 
     
     switch(format)
@@ -1103,7 +911,7 @@ TT_STATUS get_color_pixel(SURFACE_FORMAT format, u32 color, u32 *pixel_1, u32 *p
 #endif            
         default:
 
-            dpu_error("unknow format \n");
+            dpu_info(ERROR_LEVEL,"unknow format \n");
             ret = TT_FAIL;
             break;
     }
@@ -1130,7 +938,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
     {
         if (rect->pos_x % 2 || rect->width % 2)  //right ?
         {
-            dpu_error("for ycbcr422 start point and width must be even \n");
+            dpu_info(ERROR_LEVEL,"for ycbcr422 start point and width must be even \n");
             return;
         }
     }
@@ -1139,7 +947,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
 
     if (ret != TT_PASS)
     {
-        dpu_error("unkown format, cann't draw rect\n");
+        dpu_info(ERROR_LEVEL,"unkown format, cann't draw rect\n");
         return;
     }
 
@@ -1167,7 +975,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
     }
     else 
     {
-        dpu_error("why bit_cnt is %d, cann't draw rect\n",surface->bit_cnt);
+        dpu_info(ERROR_LEVEL,"why bit_cnt is %d, cann't draw rect\n",surface->bit_cnt);
         return;
     }
     
@@ -1178,7 +986,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
         {
             //base += i * surface->pitch + j * surface->bit_cnt / 8;
 
-            base = (u8*)(surface->cpu_addr + surface->pitch * i + j * surface->bit_cnt / 8);
+            base = (u8*)((u8*)surface->cpu_addr + surface->pitch * i + j * surface->bit_cnt / 8);
             
             if (draw_8bit)
             {
@@ -1212,7 +1020,7 @@ void draw_rect(struct surface_info_t *surface, struct rect_t *rect, u32 color)
                     {
                         if (!surface->alpha)
                         {
-                            dpu_warning("need do premult ,why alpha is 0 ?\n");
+                            dpu_info(WARNING_LEVEL,"need do premult ,why alpha is 0 ?\n");
                         }
                         else
                         {
@@ -1337,7 +1145,7 @@ static TT_STATUS draw_color_circle(struct surface_info_t *surface)
 
     if (surface->format != FORMAT_A8R8G8B8)
     {
-       dpu_info("arrow is used for cursor, just support ARGB8888 ? \n");
+       dpu_info(INFO_LEVEL,"arrow is used for cursor, just support ARGB8888 ? \n");
        return TT_FAIL;
     }
 
@@ -1356,7 +1164,7 @@ static TT_STATUS draw_color_circle(struct surface_info_t *surface)
     {
         for (j = 0; j < surface->width; j++)
         {
-            temp = (u32*)(surface->cpu_addr + i * surface->pitch + j * surface->bit_cnt / 8);
+            temp = (u32*)((u8*)surface->cpu_addr + i * surface->pitch + j * surface->bit_cnt / 8);
             if ((4*(h * h)*abs(j - w / 2)*abs(j - w / 2) + 4*(w * w) *abs(i - h / 2)*abs(i - h / 2)) <= w * w * h * h)
             {
                
@@ -1398,7 +1206,7 @@ TT_STATUS draw_color_1(struct surface_info_t *surface)
 
     if (surface->format != FORMAT_A2R10G10B10)
     {
-        dpu_info("color bar 1 just support A2R10G10B10 format \n");
+        dpu_info(INFO_LEVEL,"color bar 1 just support A2R10G10B10 format \n");
         return TT_FAIL;
     }
 
@@ -1495,7 +1303,7 @@ TT_STATUS tt_draw_surface(struct surface_info_t  *surface)
         surface->format == FORMAT_YCRYCB422_32 ||
         surface->format >=FORMAT_NUM)
     {
-        dpu_error("Unsupport format 0x%x\n",surface->format);
+        dpu_info(ERROR_LEVEL,"Unsupport format 0x%x\n",surface->format);
         return TT_FAIL;
     }
     
@@ -1515,7 +1323,7 @@ TT_STATUS tt_draw_surface(struct surface_info_t  *surface)
             break;
         default:
 
-            dpu_error("unknow color pattern \n");
+            dpu_info(ERROR_LEVEL,"unknow color pattern \n");
             ret = TT_FAIL;
             break;
     }
@@ -1573,11 +1381,11 @@ TT_STATUS  tt_create_surface(struct dpu_adapter_t *dpu_adapter, struct surface_c
     }
 
     surface->gpu_addr = offset;
-    surface->cpu_addr = dpu_adapter->base.fb_base + offset;
+    surface->cpu_addr = (u8*)dpu_adapter->base.fb_base + offset;
 
 
 
-    dpu_info("width is %d, height is %d, format is %d, compressed is %d, need_pre is %d, pattern %d pitch is %d \n",
+    dpu_info(INFO_LEVEL,"width is %d, height is %d, format is %d, compressed is %d, need_pre is %d, pattern %d pitch is %d \n",
         surface->width,
         surface->height,
         surface->format,
@@ -1587,7 +1395,7 @@ TT_STATUS  tt_create_surface(struct dpu_adapter_t *dpu_adapter, struct surface_c
         surface->pitch
         );
 
-    dpu_info("gpu_addr is 0x%x, cpu_addr is 0x%x, fb base is 0x%x\n",surface->gpu_addr, surface->cpu_addr, dpu_adapter->base.fb_base);
+    dpu_info(INFO_LEVEL,"gpu_addr is 0x%x, cpu_addr is 0x%x, fb base is 0x%x\n",surface->gpu_addr, surface->cpu_addr, dpu_adapter->base.fb_base);
 
     //TODO:
     //draw surface with alpha & color pattern & format
@@ -1596,7 +1404,7 @@ TT_STATUS  tt_create_surface(struct dpu_adapter_t *dpu_adapter, struct surface_c
     {
         if (TT_FAIL == tt_draw_surface(surface))
         {
-            dpu_info("draw surface faild, please help check \n");
+            dpu_info(INFO_LEVEL,"draw surface faild, please help check \n");
             status = TT_FAIL;
         }
     }
@@ -1613,5 +1421,69 @@ end_surface:
     return status;
     
 }
-   
+
+
+
+
+extern struct platform_funcs_t dos_funcs;
+extern struct platform_funcs_t linux_funcs;
+
+
+
+
+TT_STATUS init_platform_funcs()
+{
+	TT_STATUS ret = TT_PASS;
+
+#ifdef __DOS__
+
+	platform_funcs = &dos_funcs; 
+	
+#elif defined  __LINUX__
+
+	platform_funcs = &linux_funcs;
+	
+#endif
+
+
+	if (!platform_funcs ||
+		!platform_funcs->platform_init ||
+		!platform_funcs->platform_delay_micro_seconds ||
+		!platform_funcs->platform_get_linear_addr ||
+		!platform_funcs->platform_get_system_time ||
+		!platform_funcs->platform_print ||
+		!platform_funcs->platform_read_io_byte ||
+		!platform_funcs->platform_write_io_byte ||
+		!platform_funcs->platform_read_io_dword ||
+		!platform_funcs->platform_write_io_dword ||
+		!platform_funcs->platform_read_pci_config_byte ||
+		!platform_funcs->platform_read_pci_config_word ||
+		!platform_funcs->platform_write_pci_config_byte ||
+		!platform_funcs->platform_write_pci_config_word
+		)
+	{
+		ret == TT_FAIL;
+	}
+
+	return ret;
+}
+
+
+TT_STATUS tt_init_platform()
+{
+	TT_STATUS ret = TT_PASS;
+
+	ret = platform_funcs->platform_init();
+	
+	return ret;
+}
+
+TT_STATUS tt_deinit_platform(struct dpu_adapter_t * dpu_adapter)
+{
+	TT_STATUS ret = TT_PASS;
+
+	ret = platform_funcs->platform_deinit(dpu_adapter);
+	
+	return ret;
+}
 

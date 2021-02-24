@@ -9,6 +9,32 @@
 
 #include"dpu.h"
 
+#include"cmodel_wrapper.h"
+
+//#include"dpu_arch/dpu_cmodel.h"
+#ifdef __LINUX__
+
+#include <termios.h>
+#include <unistd.h>
+
+int getch (void)
+{
+    int ch;
+    struct termios oldt, newt;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON|ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    ch = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
+    return ch;
+
+}
+#endif
+
+
 
 //must sync with OUTPUT_SIGNAL
 static u8  *g_output_signal_string[] = {" INVALID"," RGB"," YUV444", " YUV422", "YUV420"};
@@ -189,7 +215,7 @@ static bool_t match_mode(struct dpu_display_mode_list_t *mode_list, struct dpu_d
 static void mode_handle_trace(struct mode_cmd_t *mode_info)
 {
 
-    dpu_trace("crtc %d crtc_valid %d, cmd_index %d cmd_index_valid %d, output %d,src(%d,%d) dst(%d,%d),rr %d list %d info %d help %d\n",
+    dpu_info(TRACE_LEVEL,"crtc %d crtc_valid %d, cmd_index %d cmd_index_valid %d, output %d,src(%d,%d) dst(%d,%d),rr %d list %d info %d help %d\n",
             mode_info->crtc_index, mode_info->crtc_valid,
             mode_info->cmd_index,mode_info->cmd_valid,
             mode_info->output,
@@ -209,14 +235,14 @@ static void mode_handle_list(struct dpu_adapter_t *dpu_adapter)
     u32 i = 0;
     struct mode_cmd_t *cached_cmd;
 
-    dpu_info("list of cached mode options: \n");
+    dpu_info(INFO_LEVEL,"list of cached mode options: \n");
     for (i = 0; i < MAX_CACHED_CMD_NUM; i++)
     {
         if (dpu_adapter->cached_cmd[MODE_CMD][i].valid)
         {
             cached_cmd = &dpu_adapter->cached_cmd[MODE_CMD][i].mode_cmd;
 
-            dpu_info("%d: crtc %d output 0x%x, src_mode (%d %d) dst_mode (%d %d), rr %d, output_signal %s\n",
+            dpu_info(INFO_LEVEL,"%d: crtc %d output 0x%x, src_mode (%d %d) dst_mode (%d %d), rr %d, output_signal %s\n",
                     i,
                     cached_cmd->crtc_index,
                     cached_cmd->output,
@@ -236,7 +262,7 @@ static void mode_handle_help()
     
     for (i = 0; i < ARRAY_SIZE(mode_options_table); i++)
     {
-        dpu_info("%s\n", mode_options_table[i].options_help);
+        dpu_info(INFO_LEVEL,"%s\n", mode_options_table[i].options_help);
     }
 
     //add more help info here
@@ -255,11 +281,11 @@ static void mode_handle_info(struct dpu_adapter_t *dpu_adapter)
 
         if (!crtc_info->output)
         {
-            dpu_info("crtc_%d: not active\n", i);
+            dpu_info(INFO_LEVEL,"crtc_%d: not active\n", i);
         }
         else
         {
-            dpu_info("crtc_%d: output 0x%5x, hw mode(%4d %4d) adjust mode(%4d %4d), rr %d, output_signal %s\n",
+            dpu_info(INFO_LEVEL,"crtc_%d: output 0x%5x, hw mode(%4d %4d) adjust mode(%4d %4d), rr %d, output_signal %s\n",
                     i,
                     crtc_info->output,
                     crtc_info->hw_mode.hactive,
@@ -295,9 +321,9 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
 
     mode_handle_trace(mode_info);
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         goto end;
     }
 
@@ -323,10 +349,10 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
     prepare_cmd.crtc_index = 0;
     prepare_cmd.output = DPU_PORT_0;
 
-    prepare_cmd.src_xres = 1920;
-    prepare_cmd.src_yres = 1080;
-    prepare_cmd.dst_xres = 1920;
-    prepare_cmd.dst_yres = 1080;
+    prepare_cmd.src_xres = 1280;//1920;
+    prepare_cmd.src_yres = 720;//1080;
+    prepare_cmd.dst_xres = 1280;//1920;
+    prepare_cmd.dst_yres = 720;//1080;
     prepare_cmd.rr = 60;
     prepare_cmd.output_signal = DPU_RGB_SIGNAL;
     prepare_cmd.bpc = 8;
@@ -381,39 +407,39 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
 
 	if (prepare_cmd.crtc_index >= DPU_MAX_CRTC_NUM)
 	{
-		dpu_info("invalid crtc %d", prepare_cmd.crtc_index);
+		dpu_info(INFO_LEVEL,"invalid crtc %d", prepare_cmd.crtc_index);
 		goto end;
 	}
 
 	if (!(prepare_cmd.output & dpu_adapter->support_device))
 	{
-		dpu_info("invalid devive 0x%x\n", prepare_cmd.output);
+		dpu_info(INFO_LEVEL,"invalid devive 0x%x\n", prepare_cmd.output);
 		goto end;
 	}
 
 	output_info = &dpu_adapter->current_output_info[tt_get_last_bit(prepare_cmd.output)];
 	crtc_info = &dpu_adapter->current_crtc_info[prepare_cmd.crtc_index];
 
-	if (!(prepare_cmd.output_signal & output_info->display_caps.support_signal.output_signal))
+	if (0)//!(prepare_cmd.output_signal & output_info->display_caps.support_signal.output_signal))
 	{
-		dpu_info("invalid output signal\n");
+		dpu_info(INFO_LEVEL,"invalid output signal\n");
 		goto end;
 	}
 
-	if (!(prepare_cmd.bpc > output_info->display_caps.max_color_depth))
+	if (0)//!(prepare_cmd.bpc > output_info->display_caps.max_color_depth))
 	{
-		dpu_info("bpc %d out of range\n", prepare_cmd.bpc);
+		dpu_info(INFO_LEVEL,"bpc %d out of range\n", prepare_cmd.bpc);
 		goto end;
 	}
 
 	if (!match_mode(&output_info->mode_list, &crtc_info->hw_mode, prepare_cmd.src_xres, prepare_cmd.src_yres, prepare_cmd.rr))
 	{
-		dpu_info("can't match hw mode\n");
+		dpu_info(INFO_LEVEL,"can't match hw mode\n");
 		goto end;
 	}
 	if (!match_mode(&output_info->mode_list, &crtc_info->adjust_mode, prepare_cmd.dst_xres, prepare_cmd.dst_yres, prepare_cmd.rr))
 	{
-		dpu_info("can't match adjust mode\n");
+		dpu_info(INFO_LEVEL,"can't match adjust mode\n");
 		goto end;
 	}
 
@@ -489,7 +515,7 @@ end:
 
 static void plane_handle_trace(struct plane_cmd_t *plane_cmd)
 {
-    dpu_trace("crtc %d, ci_valid %d surface %d surface_valid %d, plane %d, plane_valid %d  info %d list %d help %d \n",
+    dpu_info(TRACE_LEVEL,"crtc %d, ci_valid %d surface %d surface_valid %d, plane %d, plane_valid %d  info %d list %d help %d \n",
          plane_cmd->crtc_index,
          plane_cmd->ci_valid,
          plane_cmd->surface_index,
@@ -500,7 +526,7 @@ static void plane_handle_trace(struct plane_cmd_t *plane_cmd)
          plane_cmd->list_cmd,
          plane_cmd->help_cmd);
     
-    dpu_trace("src_window (%d,%d,%d,%d) src_valid %d dst_window(%d,%d,%d,%d) dst_valid %d cmd_index %d, cmd_valid %d disable %d, d_v %d\n",
+    dpu_info(TRACE_LEVEL,"src_window (%d,%d,%d,%d) src_valid %d dst_window(%d,%d,%d,%d) dst_valid %d cmd_index %d, cmd_valid %d disable %d, d_v %d\n",
          plane_cmd->src_x,
          plane_cmd->src_y,
          plane_cmd->src_w,
@@ -516,7 +542,7 @@ static void plane_handle_trace(struct plane_cmd_t *plane_cmd)
          plane_cmd->disable_plane,
          plane_cmd->dp_valid);
     
-    dpu_debug("overlay key mode %d mode_valid %d k0 %d  k1 %d  k2 %d  k_valid 0x%x\n",
+    dpu_info(TRACE_LEVEL,"overlay key mode %d mode_valid %d k0 %d  k1 %d  k2 %d  k_valid 0x%x\n",
          plane_cmd->overlay_cmd.mode,
          plane_cmd->overlay_cmd.m_valid,
          plane_cmd->overlay_cmd.k0,
@@ -530,14 +556,14 @@ static void plane_handle_list(struct dpu_adapter_t *dpu_adapter)
     u32 i = 0;
     struct plane_cmd_t *cached_cmd = NULL;
 
-    dpu_info("list of cached plane cmd: \n");
+    dpu_info(INFO_LEVEL,"list of cached plane cmd: \n");
     for (i = 0; i < MAX_CACHED_CMD_NUM; i++)
     {
         if (dpu_adapter->cached_cmd[PLANE_CMD][i].valid)
         {
             cached_cmd = &dpu_adapter->cached_cmd[PLANE_CMD][i].plane_cmd;
                  
-            dpu_info("index %d: crtc %d, plane %d, surface %d src(%d,%d,%d,%d) dst(%d,%d,%d,%d) disable %d\n",
+            dpu_info(INFO_LEVEL,"index %d: crtc %d, plane %d, surface %d src(%d,%d,%d,%d) dst(%d,%d,%d,%d) disable %d\n",
                 i,
                 cached_cmd->crtc_index,
                 cached_cmd->plane_type,
@@ -551,7 +577,7 @@ static void plane_handle_list(struct dpu_adapter_t *dpu_adapter)
                 cached_cmd->dst_w,
                 cached_cmd->dst_h,
                 cached_cmd->disable_plane);
-            dpu_info("          overlay: key mode %d k0 %d k1 %d k2 %d \n",
+            dpu_info(INFO_LEVEL,"          overlay: key mode %d k0 %d k1 %d k2 %d \n",
                 cached_cmd->overlay_cmd.mode,
                 cached_cmd->overlay_cmd.k0,
                 cached_cmd->overlay_cmd.k1,
@@ -565,23 +591,23 @@ static void plane_handle_help()
     u32 i = 0;
     for (i = 0; i < ARRAY_SIZE(plane_options_table); i++)
     {
-        dpu_info("%s\n", plane_options_table[i].options_help);
+        dpu_info(INFO_LEVEL,"%s\n", plane_options_table[i].options_help);
     }
 
     //add more help info here
 
-    dpu_info("--detail info about [-kv k0 k1 k2]\n");
-    dpu_info("  0: Constant_Alpha;                 alpha = k0(0x00~0xFF)\n");
-    dpu_info("  1: PS Alpha Blending;              alpha blend type = k0(0: coverage; 1: pre-multiplied), plane value = k1(0x00~0xFF)\n");
-    dpu_info("  2: SS/TS Over PS    Color Key;     color key type = k0(0:input A.Color_key Or input B.Color_Key,\n");
-    dpu_info("                                                         1:input A.Color_key, 2:input B.Color_Key\n");
-    dpu_info("  3: PS    Over SS/TS Color Key;     color key = k0(ex. 0xff0000)\n");
-    dpu_info("  4: SS/TS Over PS    Window Key;    kp = k0(0~8), ks = k1(0~8)  NOTE: kp + ks = 8\n");
-    dpu_info("  5: SS/TS Over PS    Alpha Key;     kp = k0(0~8), ks = k1(0~8), alpha key = k2(0x00~0xFF)  NOTE: kp + ks = 8\n");
-    dpu_info("  6: PS    Over SS/TS Window Key;    kp = k0(0~8), ks = k1(0~8)  NOTE: kp + ks = 8\n");
-    dpu_info("  7: PS    Over SS/TS Alpha Key;     kp = k0(0~8), ks = k1(0~8), alpha key = k2(0x00~0xFF)  NOTE: kp + ks = 8\n");
-    dpu_info("  8: SS/TS Alpha Blending.           alpha blend type = k0(0: coverage; 1: pre-multiplied), plane value = k1\n\n");
-    dpu_info("  9: chroma Key(ps over ss, only support ycbcr422_16);     lower key = k0, upper key = k1\n");
+    dpu_info(INFO_LEVEL,"--detail info about [-kv k0 k1 k2]\n");
+    dpu_info(INFO_LEVEL,"  0: Constant_Alpha;                 alpha = k0(0x00~0xFF)\n");
+    dpu_info(INFO_LEVEL,"  1: PS Alpha Blending;              alpha blend type = k0(0: coverage; 1: pre-multiplied), plane value = k1(0x00~0xFF)\n");
+    dpu_info(INFO_LEVEL,"  2: SS/TS Over PS    Color Key;     color key type = k0(0:input A.Color_key Or input B.Color_Key,\n");
+    dpu_info(INFO_LEVEL,"                                                         1:input A.Color_key, 2:input B.Color_Key\n");
+    dpu_info(INFO_LEVEL,"  3: PS    Over SS/TS Color Key;     color key = k0(ex. 0xff0000)\n");
+    dpu_info(INFO_LEVEL,"  4: SS/TS Over PS    Window Key;    kp = k0(0~8), ks = k1(0~8)  NOTE: kp + ks = 8\n");
+    dpu_info(INFO_LEVEL,"  5: SS/TS Over PS    Alpha Key;     kp = k0(0~8), ks = k1(0~8), alpha key = k2(0x00~0xFF)  NOTE: kp + ks = 8\n");
+    dpu_info(INFO_LEVEL,"  6: PS    Over SS/TS Window Key;    kp = k0(0~8), ks = k1(0~8)  NOTE: kp + ks = 8\n");
+    dpu_info(INFO_LEVEL,"  7: PS    Over SS/TS Alpha Key;     kp = k0(0~8), ks = k1(0~8), alpha key = k2(0x00~0xFF)  NOTE: kp + ks = 8\n");
+    dpu_info(INFO_LEVEL,"  8: SS/TS Alpha Blending.           alpha blend type = k0(0: coverage; 1: pre-multiplied), plane value = k1\n\n");
+    dpu_info(INFO_LEVEL,"  9: chroma Key(ps over ss, only support ycbcr422_16);     lower key = k0, upper key = k1\n");
 
 }
 
@@ -592,18 +618,18 @@ static void plane_handle_info(struct dpu_adapter_t *dpu_adapter)
     
     for (i = 0; i < CRTC_NUM; i++)
     {
-        dpu_info("crtc %d \n",i);
+        dpu_info(INFO_LEVEL,"crtc %d \n",i);
         for (j = 0; j < PLANE_NUM; j++)
         {
             plane_info = &dpu_adapter->current_plane_info[i][j];
 
             if (plane_info->plane_state == PLANE_DISABLED || !plane_info->surface)
             {
-                dpu_info("      plane %d is disabled\n",j);
+                dpu_info(INFO_LEVEL,"      plane %d is disabled\n",j);
             }
             else
             {
-                dpu_info("      plane %d :src(%d,%d,%d,%d) dst(%d,%d,%d,%d) g_addr 0x%08x c_addr 0x%8x size (%d,%d) pitch %d, fmt %s, compress %d si %d\n",
+                dpu_info(INFO_LEVEL,"      plane %d :src(%d,%d,%d,%d) dst(%d,%d,%d,%d) g_addr 0x%08x c_addr 0x%8x size (%d,%d) pitch %d, fmt %s, compress %d si %d\n",
                     plane_info->plane_type,
                     plane_info->src_x,
                     plane_info->src_y,
@@ -625,70 +651,70 @@ static void plane_handle_info(struct dpu_adapter_t *dpu_adapter)
 
             if (plane_info->plane_type != PRIMARY_PLANE)
             {
-                dpu_info("            overlay info : mode %s \n", g_key_mode_string[plane_info->overlay_info.mode]);
+                dpu_info(INFO_LEVEL,"            overlay info : mode %s \n", g_key_mode_string[plane_info->overlay_info.mode]);
                 switch(plane_info->overlay_info.mode)
                 {
                     case CONSTANT_ALPHA:
-                        dpu_info("            alpha: 0x%x, invert_alpha %d\n",
+                        dpu_info(INFO_LEVEL,"            alpha: 0x%x, invert_alpha %d\n",
                         plane_info->overlay_info.constant_alpha_blending.constant_alpha,
                         plane_info->overlay_info.constant_alpha_blending.invert);
                         if (plane_info->overlay_info.constant_alpha_blending.plane_blending)
                         {
-                            dpu_info("            with plane bending: 0x%x \n",
+                            dpu_info(INFO_LEVEL,"            with plane bending: 0x%x \n",
                             plane_info->overlay_info.constant_alpha_blending.plane_value);
                         }
                         else
                         {
-                            dpu_info("            with no plane bneding\n");
+                            dpu_info(INFO_LEVEL,"            with no plane bneding\n");
                         }
 
                         break;
                     case PS_ALPHA_BLENDING:
                     case SS_ALPHA_BLENDING:
-                        dpu_info("            %s, use %s alpha, invert_alpha %d\n",
+                        dpu_info(INFO_LEVEL,"            %s, use %s alpha, invert_alpha %d\n",
                         plane_info->overlay_info.alpha_blending.premul_blend ? "premult":"coverage",
                         plane_info->overlay_info.alpha_blending.use_ps_alpha ? "PS" : "SS",
                         plane_info->overlay_info.alpha_blending.invert_alpha);
                         if (plane_info->overlay_info.alpha_blending.plane_blending)
                         {
-                            dpu_info("            with plane bending: 0x%x\n",
+                            dpu_info(INFO_LEVEL,"            with plane bending: 0x%x\n",
                             plane_info->overlay_info.alpha_blending.plane_value);
                         }
                         else
                         {
-                            dpu_info("            with no plane bneding\n");
+                            dpu_info(INFO_LEVEL,"            with no plane bneding\n");
                         }
                         break;
                     case POS_COLOR_KEY:
                     case SOP_COLOR_KEY:
                     //TODO: type ?
-                        dpu_info("            type %d, %s color\n",
+                        dpu_info(INFO_LEVEL,"            type %d, %s color\n",
                         plane_info->overlay_info.color_key.type,
                         plane_info->overlay_info.color_key._10bit_color ? "10bit": "8bit");
                         break;
                     case SOP_WINDOW_KEY:
                     case POS_WINDOW_KEY:
 
-                        dpu_info("            kp %d, ks %d\n",
+                        dpu_info(INFO_LEVEL,"            kp %d, ks %d\n",
                         plane_info->overlay_info.window_key.kp,
                         plane_info->overlay_info.window_key.ks);
                         break;
                     case  SOP_ALPHA_KEY:
                     case  POS_ALPHA_KEY:
 
-                        dpu_info("            kp %d ks %d\n",
+                        dpu_info(INFO_LEVEL,"            kp %d ks %d\n",
                         plane_info->overlay_info.alpha_key.kp,
                         plane_info->overlay_info.alpha_key.ks);
                         break;
                     case  CHROMA_KEY:
 
-                        dpu_info("            lower bound 0x%x, upper bound 0x%x",
+                        dpu_info(INFO_LEVEL,"            lower bound 0x%x, upper bound 0x%x",
                         plane_info->overlay_info.chroma_key.lower_bound,
                         plane_info->overlay_info.chroma_key.upper_bound);
                         break;
                     default:
 
-                        dpu_error("unknow blending mode !!!\n");
+                        dpu_info(ERROR_LEVEL,"unknow blending mode !!!\n");
                         break;
                     }
                 }
@@ -711,9 +737,9 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
 
     plane_handle_trace(plane_cmd);
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         goto end;
     }
 
@@ -777,7 +803,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
         }
         else
         {
-            dpu_error("input crtc index is invalid ,please help check\n");
+            dpu_info(ERROR_LEVEL,"input crtc index is invalid ,please help check\n");
             need_page_flip = 0;
         }
     }
@@ -795,7 +821,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
         }
         else
         {
-            dpu_error("input surface index is invalid ,please help check\n");
+            dpu_info(ERROR_LEVEL,"input surface index is invalid ,please help check\n");
             need_page_flip = 0;
         }
     }
@@ -834,7 +860,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
         }
         else
         {
-            dpu_error("input plane type is invalid ,please help check\n");
+            dpu_info(ERROR_LEVEL,"input plane type is invalid ,please help check\n");
             need_page_flip = 0;
         }
     }
@@ -848,7 +874,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
         }
         else
         {
-            dpu_error("input overlay key mode is invalid ,please help check\n");
+            dpu_info(ERROR_LEVEL,"input overlay key mode is invalid ,please help check\n");
             need_page_flip = 0;
         }       
     }
@@ -1106,7 +1132,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
                     
                     break;
                 default:
-                    dpu_info("shouldn't be here , invalid overlay key mode !!!\n");
+                    dpu_info(INFO_LEVEL,"shouldn't be here , invalid overlay key mode !!!\n");
                     
                     break;
             }
@@ -1116,7 +1142,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
 
         if (DPU_OK != dpu_update_plane(dpu_adapter->dpu_manager, &plane_set))
         {
-            dpu_error("update plane failed ,please help check \n");
+            dpu_info(ERROR_LEVEL,"update plane failed ,please help check \n");
             ret = TT_FAIL;
             goto end;
         }
@@ -1133,7 +1159,7 @@ end:
 
 static void surface_handle_trace(struct surface_cmd_t *surface_cmd)
 {
-    dpu_trace("surface_index: %d si_valid %d, width %d height %d, alpha 0x%x, a_valid %d, pattern %d, format %d\n",
+    dpu_info(TRACE_LEVEL,"surface_index: %d si_valid %d, width %d height %d, alpha 0x%x, a_valid %d, pattern %d, format %d\n",
         surface_cmd->surface_index,
         surface_cmd->si_valid,
         surface_cmd->width,
@@ -1142,7 +1168,7 @@ static void surface_handle_trace(struct surface_cmd_t *surface_cmd)
         surface_cmd->alpha_valid,
         surface_cmd->pattern,
         surface_cmd->format);
-    dpu_trace("no_draw %d, premult %d, compressed %d, list_cmd %d, info_cmd %d help %d, cmd_index %d c_valid %d\n",
+    dpu_info(TRACE_LEVEL,"no_draw %d, premult %d, compressed %d, list_cmd %d, info_cmd %d help %d, cmd_index %d c_valid %d\n",
         surface_cmd->no_draw,
         surface_cmd->premult,
         surface_cmd->compressed,
@@ -1160,7 +1186,7 @@ static void surface_handle_info(struct dpu_adapter_t *dpu_adapter)
     u32 i = 0;
     struct surface_info_t *surface = NULL;
     
-    dpu_info("\nTotal surface num is %d\n", dpu_adapter->surface_manager.num);
+    dpu_info(INFO_LEVEL,"\nTotal surface num is %d\n", dpu_adapter->surface_manager.num);
 
 
     for (i = 0; i < MAX_SURFACE_NUM; i ++)
@@ -1171,7 +1197,7 @@ static void surface_handle_info(struct dpu_adapter_t *dpu_adapter)
         }
         surface = &dpu_adapter->surface_manager.surfaces[i].surface;
 
-        dpu_info("surface %d: w %4d h %4d pitch %4d  %s,  %s, gpu_addr 0x%8x cpu_addr 0x%8x compress %d, do_premult %d\n",
+        dpu_info(INFO_LEVEL,"surface %d: w %4d h %4d pitch %4d  %s,  %s, gpu_addr 0x%8x cpu_addr 0x%8x compress %d, do_premult %d\n",
             i,
             surface->width,
             surface->height,
@@ -1184,7 +1210,7 @@ static void surface_handle_info(struct dpu_adapter_t *dpu_adapter)
             surface->need_premult);
     }
 
-     dpu_info("\n");
+     dpu_info(INFO_LEVEL,"\n");
 }
 
 static void surface_handle_help()
@@ -1192,21 +1218,21 @@ static void surface_handle_help()
     u32 i = 0;
     for (i = 0; i < ARRAY_SIZE(surface_options_table); i++)
     {
-        dpu_info("%s\n", surface_options_table[i].options_help);
+        dpu_info(INFO_LEVEL,"%s\n", surface_options_table[i].options_help);
     }
 
-    dpu_info("--format index:\n");
+    dpu_info(INFO_LEVEL,"--format index:\n");
     for (i = 1; i < ARRAY_SIZE(g_format_info_string); i++)
     {
         if (i % 10 == 0)
         {
-            dpu_info("\n");
+            dpu_info(INFO_LEVEL,"\n");
         }
 
-        dpu_info("%d %s,",i,g_format_info_string[i].format_name);
+        dpu_info(INFO_LEVEL,"%d %s,",i,g_format_info_string[i].format_name);
     }
 
-    dpu_info("\n");
+    dpu_info(INFO_LEVEL,"\n");
 }
 
 static void surface_handle_list(struct dpu_adapter_t *dpu_adapter)
@@ -1214,14 +1240,14 @@ static void surface_handle_list(struct dpu_adapter_t *dpu_adapter)
     u32 i = 0;
     struct surface_cmd_t *cached_cmd = NULL;
 
-    dpu_info("list of cached surface cmd (just cache create cmd): \n");
+    dpu_info(INFO_LEVEL,"list of cached surface cmd (just cache create cmd): \n");
     for (i = 0; i < MAX_CACHED_CMD_NUM; i++)
     {
         if (dpu_adapter->cached_cmd[SURFACE_CMD][i].valid)
         {
             cached_cmd = &dpu_adapter->cached_cmd[SURFACE_CMD][i].surface_cmd;
                  
-            dpu_info("index %d: width %d height %d aplha %d , pattern %s, format %s, no_draw %d, premult %d, compress %d\n",
+            dpu_info(INFO_LEVEL,"index %d: width %d height %d aplha %d , pattern %s, format %s, no_draw %d, premult %d, compress %d\n",
                 i,
                 cached_cmd->width,
                 cached_cmd->height,
@@ -1247,7 +1273,7 @@ static struct surface_info_t* alloc_surface(struct dpu_adapter_t *dpu_adapter)
     if (dpu_adapter->surface_manager.num >= MAX_SURFACE_NUM)
     {
 
-        dpu_info("please increase macro MAX_SURFACE_NUM \n");
+        dpu_info(INFO_LEVEL,"please increase macro MAX_SURFACE_NUM \n");
         surface = NULL;
         return surface;
     }
@@ -1257,14 +1283,14 @@ static struct surface_info_t* alloc_surface(struct dpu_adapter_t *dpu_adapter)
         if (dpu_adapter->surface_manager.surfaces[i].valid == 0)
         {
             surface = &dpu_adapter->surface_manager.surfaces[i].surface;
-            dpu_info("create new surface, it's index is %d\n",i);
+            dpu_info(INFO_LEVEL,"create new surface, it's index is %d\n",i);
             break;
         }
     }
 
     if (i == MAX_SURFACE_NUM)
     {
-        dpu_error("No enough surface id, please help check\n");
+        dpu_info(ERROR_LEVEL,"No enough surface id, please help check\n");
         surface = NULL;
     }
     else
@@ -1282,7 +1308,7 @@ static TT_STATUS free_surface(struct dpu_adapter_t *dpu_adapter, u32 index)
 
     if (index >= MAX_SURFACE_NUM || dpu_adapter->surface_manager.surfaces[index].valid == 0)
     {
-        dpu_error("%s:  invalid para \n",__func__);
+        dpu_info(ERROR_LEVEL,"%s:  invalid para \n",__func__);
         return TT_FAIL;
     }
 
@@ -1421,7 +1447,7 @@ static TT_STATUS surface_handle(struct dpu_adapter_t *dpu_adapter, struct surfac
         }
         else
         {
-            dpu_error("invalid surface format, please help check \n");
+            dpu_info(ERROR_LEVEL,"invalid surface format, please help check \n");
             need_create = 0;
         }
     }
@@ -1434,7 +1460,7 @@ static TT_STATUS surface_handle(struct dpu_adapter_t *dpu_adapter, struct surfac
         }
         else
         {
-            dpu_error("invalid color pattern ,please help check \n");
+            dpu_info(ERROR_LEVEL,"invalid color pattern ,please help check \n");
             need_create = 0;
         }
     }
@@ -1474,7 +1500,7 @@ static TT_STATUS surface_handle(struct dpu_adapter_t *dpu_adapter, struct surfac
 
         //create surface
 
-        dpu_info("create surface \n");
+        dpu_info(INFO_LEVEL,"create surface \n");
         ret = tt_create_surface(dpu_adapter, &prepare_cmd);
     }
 
@@ -1485,7 +1511,7 @@ end:
 
 static void device_handle_trace(struct device_cmd_t *device_cmd)
 {
-    dpu_trace("output 0x%x, disable %d, lr %d lc %d async_clck %d, enhanced_frame_mode %d\n",
+    dpu_info(TRACE_LEVEL,"output 0x%x, disable %d, lr %d lc %d async_clck %d, enhanced_frame_mode %d\n",
         device_cmd->output,
         device_cmd->disable,
         device_cmd->link_rate,
@@ -1495,7 +1521,7 @@ static void device_handle_trace(struct device_cmd_t *device_cmd)
         );
 
 
-    dpu_trace("bit_depth %d, color_fromat %d, cea %d, coef %d, modelist %d, info %d, list %d, help %d, cmd %d cmd valid %d\n",
+    dpu_info(TRACE_LEVEL,"bit_depth %d, color_fromat %d, cea %d, coef %d, modelist %d, info %d, list %d, help %d, cmd %d cmd valid %d\n",
         device_cmd->bit_depth,
         device_cmd->color_format,
         device_cmd->cea,
@@ -1513,7 +1539,7 @@ static void device_handle_help()
     u32 i = 0;
     for (i = 0; i < ARRAY_SIZE(device_options_table); i++)
     {
-        dpu_info("%s\n", device_options_table[i].options_help);
+        dpu_info(INFO_LEVEL,"%s\n", device_options_table[i].options_help);
     }
 
 }
@@ -1523,26 +1549,26 @@ static void device_handle_info(struct dpu_adapter_t *dpu_adapter)
     u32 i = 0;
     struct output_info_t *output = NULL;
 
-    dpu_info("support device 0x%x \n", dpu_adapter->support_device);
+    dpu_info(INFO_LEVEL,"support device 0x%x \n", dpu_adapter->support_device);
 
     for (i = 0; i < PORT_NUM; i++)
     {
         output = &dpu_adapter->current_output_info[i];
         if (output->connect_status == DISCONNECTED)
         {
-            dpu_info("output 0x%x disconnected\n",output->device);
+            dpu_info(INFO_LEVEL,"output 0x%x disconnected\n",output->device);
             continue;
         }
 
         if (output->power_status == POWER_OFF)
         {
-            dpu_info("output 0x%x is power off\n", output->device);
+            dpu_info(INFO_LEVEL,"output 0x%x is power off\n", output->device);
             continue;
         }
 
         if (output->crtc)
         {
-            dpu_info("crtc %d --- output 0x%x num_modes is %d, lr %d lc %d async_clck %d, enhanced_frame_mode %d\n",
+            dpu_info(INFO_LEVEL,"crtc %d --- output 0x%x num_modes is %d, lr %d lc %d async_clck %d, enhanced_frame_mode %d\n",
                 output->crtc->index,
                 output->device,
                 output->mode_list.num,
@@ -1551,7 +1577,7 @@ static void device_handle_info(struct dpu_adapter_t *dpu_adapter)
                 output->async_clk,
                 output->enhanced_frame_mode);
 
-            dpu_info("             bit_depth %d, color_fromat %d, cea %d, coef %d\n",
+            dpu_info(INFO_LEVEL,"             bit_depth %d, color_fromat %d, cea %d, coef %d\n",
                 output->bit_depth,
                 output->color_format,
                 output->cea,
@@ -1559,7 +1585,7 @@ static void device_handle_info(struct dpu_adapter_t *dpu_adapter)
         }
         else
         {
-            dpu_info("device 0x%x is not active \n",output->device);
+            dpu_info(INFO_LEVEL,"device 0x%x is not active \n",output->device);
         }
     }
 }
@@ -1570,14 +1596,14 @@ static void device_handle_list(struct dpu_adapter_t *dpu_adapter)
     u32 i = 0;
     struct device_cmd_t *cached_cmd = NULL;
 
-    dpu_info("list of cached device cmd: \n");
+    dpu_info(INFO_LEVEL,"list of cached device cmd: \n");
     for (i = 0; i < MAX_CACHED_CMD_NUM; i++)
     {
         if (dpu_adapter->cached_cmd[DEVICE_CMD][i].valid)
         {
             cached_cmd = &dpu_adapter->cached_cmd[DEVICE_CMD][i].device_cmd;
                  
-            dpu_info("index %d: output 0x%x, lr %d, lc %d, async_clock %d, frame_mode %d, bit_depth %d color_format %d cea %d coef %d\n",
+            dpu_info(INFO_LEVEL,"index %d: output 0x%x, lr %d, lc %d, async_clock %d, frame_mode %d, bit_depth %d color_format %d cea %d coef %d\n",
                     i,
                     cached_cmd->output,
                     cached_cmd->link_rate,
@@ -1603,12 +1629,12 @@ static void print_mode_list(struct dpu_adapter_t *dpu_adapter, u32 output)
     {
         if (output == dpu_adapter->current_output_info[i].device)
         {
-            dpu_info("mode num of 0x%x is %d \n",output,dpu_adapter->current_output_info[i].mode_list.num);
+            dpu_info(INFO_LEVEL,"mode num of 0x%x is %d \n",output,dpu_adapter->current_output_info[i].mode_list.num);
 
             for (j = 0; j < dpu_adapter->current_output_info[i].mode_list.num; j++)
             {
             	mode = &dpu_adapter->current_output_info[i].mode_list.modes[j];
-                dpu_info("%d: %d x %d @ %d\n",
+                dpu_info(INFO_LEVEL,"%d: %d x %d @ %d\n",
                     j,
                     mode->hactive,
                     mode->vactive,
@@ -1633,71 +1659,71 @@ void print_display_info(struct dpu_adapter_t *dpu_adapter, u32 output)
 			display_info = &output_info->display_caps;
 
 			if (display_info->monitor_type == MONITOR_TYPE_HDMI) {
-				dpu_info("hdmi: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
+				dpu_info(INFO_LEVEL,"hdmi: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
 					display_info->horizontal_cm, display_info->vertical_cm);
-				dpu_info("rgb color depth support: %s %s %s %s %s\n", 
+				dpu_info(INFO_LEVEL,"rgb color depth support: %s %s %s %s %s\n", 
 					display_info->hdmi_caps.rgb_dc.dc_6 ? "6 bit" : "",
 					display_info->hdmi_caps.rgb_dc.dc_10 ? "10 bit" : "",
 					display_info->hdmi_caps.rgb_dc.dc_12 ? "12 bit" : "",
 					display_info->hdmi_caps.rgb_dc.dc_14 ? "14 bit" : "",
 					display_info->hdmi_caps.rgb_dc.dc_16 ? "16 bit" : "");
-					dpu_info("ycbcr444 color depth support: %s %s %s %s %s %s\n", 
+					dpu_info(INFO_LEVEL,"ycbcr444 color depth support: %s %s %s %s %s %s\n", 
 					display_info->hdmi_caps.ycbcr444_dc.dc_6 ? "6 bit" : "",
 					display_info->hdmi_caps.ycbcr444_dc.dc_10 ? "10 bit" : "",
 					display_info->hdmi_caps.ycbcr444_dc.dc_12 ? "12 bit" : "",
 					display_info->hdmi_caps.ycbcr444_dc.dc_14 ? "14 bit" : "",
 					display_info->hdmi_caps.ycbcr444_dc.dc_16 ? "16 bit" : "");
-					dpu_info("ycbcr420 color depth support: %s %s %s %s %s %s\n", 
+					dpu_info(INFO_LEVEL,"ycbcr420 color depth support: %s %s %s %s %s %s\n", 
 					display_info->hdmi_caps.ycbcr420_dc.dc_6 ? "6 bit" : "",
 					display_info->hdmi_caps.ycbcr420_dc.dc_10 ? "10 bit" : "",
 					display_info->hdmi_caps.ycbcr420_dc.dc_12 ? "12 bit" : "",
 					display_info->hdmi_caps.ycbcr420_dc.dc_14 ? "14 bit" : "",
 					display_info->hdmi_caps.ycbcr420_dc.dc_16 ? "16 bit" : "");
-				dpu_info("scramble support: %s\n", display_info->hdmi_caps.scramble ? "YES" : "NO");
-				dpu_info("scdc support: %s\n", display_info->hdmi_caps.scdc_support ? "YES" : "NO");
-				dpu_info("read request support: %s\n", display_info->hdmi_caps.read_request ? "YES" : "NO");
+				dpu_info(INFO_LEVEL,"scramble support: %s\n", display_info->hdmi_caps.scramble ? "YES" : "NO");
+				dpu_info(INFO_LEVEL,"scdc support: %s\n", display_info->hdmi_caps.scdc_support ? "YES" : "NO");
+				dpu_info(INFO_LEVEL,"read request support: %s\n", display_info->hdmi_caps.read_request ? "YES" : "NO");
 				
 			}else if (display_info->monitor_type == MONITOR_TYPE_DVI) {
-				dpu_info("dvi: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
+				dpu_info(INFO_LEVEL,"dvi: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
 					display_info->horizontal_cm, display_info->vertical_cm);
 			} else if (display_info->monitor_type == MONITOR_TYPE_DP) {
-				dpu_info("dp: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
+				dpu_info(INFO_LEVEL,"dp: %s by %s, (%dx%d)cm\n", display_info->monitor_name, display_info->monitor_vendor,
 					display_info->horizontal_cm, display_info->vertical_cm);
-				dpu_info("max link rate %d\n", display_info->dp_caps.max_link_rate);
-				dpu_info("max link cnt %d\n", display_info->dp_caps.max_link_cnt);
+				dpu_info(INFO_LEVEL,"max link rate %d\n", display_info->dp_caps.max_link_rate);
+				dpu_info(INFO_LEVEL,"max link cnt %d\n", display_info->dp_caps.max_link_cnt);
 			} else if (display_info->monitor_type == MONITOR_TYPE_EDP) {
-				dpu_info("backlight support: %s\n", display_info->panel_caps.backlight_support ? "YES" : "NO");
+				dpu_info(INFO_LEVEL,"backlight support: %s\n", display_info->panel_caps.backlight_support ? "YES" : "NO");
 				if (display_info->panel_caps.backlight_support) {
-					dpu_info("range: [%d - %d]\n", display_info->panel_caps.min_bl_level,
+					dpu_info(INFO_LEVEL,"range: [%d - %d]\n", display_info->panel_caps.min_bl_level,
 						display_info->panel_caps.max_bl_level);
 				}
 			}
 
-			dpu_info("max color depth %d\n", display_info->max_color_depth);
-			dpu_info("max tmds clock %d\n", display_info->max_tmds_clk);
-			dpu_info("output signal support: %s %s %s\n",
+			dpu_info(INFO_LEVEL,"max color depth %d\n", display_info->max_color_depth);
+			dpu_info(INFO_LEVEL,"max tmds clock %d\n", display_info->max_tmds_clk);
+			dpu_info(INFO_LEVEL,"output signal support: %s %s %s\n",
 				display_info->support_signal.rgb ? "RGB" : "",
 				display_info->support_signal.ycbcr444 ? "YCBCR444" : "",
 				display_info->support_signal.ycbcr422 ? "YCBCR422" : "");
-			dpu_info("hdr support: %s\n", display_info->hdr_caps.hdr_support ? "YES" : "NO");
+			dpu_info(INFO_LEVEL,"hdr support: %s\n", display_info->hdr_caps.hdr_support ? "YES" : "NO");
 			if (display_info->hdr_caps.hdr_support) {
-				dpu_info("colorimetry support %s %s %s\n",
+				dpu_info(INFO_LEVEL,"colorimetry support %s %s %s\n",
 					display_info->hdr_caps.colorimetry.BT2020CYCC ? "BT2020 C YCC" : "",
 					display_info->hdr_caps.colorimetry.BT2020YCC ? "BT2020 YCC" : "",
 					display_info->hdr_caps.colorimetry.BT2020RGB ? "BT2020 RGB" : "");
-				dpu_info("eotf(gamma): %s %s %s %s", 
+				dpu_info(INFO_LEVEL,"eotf(gamma): %s %s %s %s", 
 					display_info->hdr_caps.static_hdr.SMPT_2084 ? "SMPT 2084" : "",
 					display_info->hdr_caps.static_hdr.HLG_gamma ? "HLG" : "");
-				dpu_info("luminance: [%d - %d] avr: %d\n",
+				dpu_info(INFO_LEVEL,"luminance: [%d - %d] avr: %d\n",
 					display_info->hdr_caps.static_hdr.desired_min_luminance,
 					display_info->hdr_caps.static_hdr.desired_max_luminance,
 					display_info->hdr_caps.static_hdr.desired_max_average_luminance);
 			}
-			dpu_info("dynamic range support: %s\n", display_info->monitor_range.support ? "YES" : "NO");
+			dpu_info(INFO_LEVEL,"dynamic range support: %s\n", display_info->monitor_range.support ? "YES" : "NO");
 			if (display_info->monitor_range.support)
-				dpu_info("%d - %d Hz\n", display_info->monitor_range.min_vrate, display_info->monitor_range.max_vrate);
+				dpu_info(INFO_LEVEL,"%d - %d Hz\n", display_info->monitor_range.min_vrate, display_info->monitor_range.max_vrate);
 
-			dpu_info("audio support: %s\n", display_info->audio_support ? "YES ": "NO");
+			dpu_info(INFO_LEVEL,"audio support: %s\n", display_info->audio_support ? "YES ": "NO");
 
 			
 			break;
@@ -1721,9 +1747,9 @@ static TT_STATUS device_handle(struct dpu_adapter_t *dpu_adapter, struct device_
 
     device_handle_trace(device_cmd);
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         goto end;
     }
 
@@ -1769,7 +1795,7 @@ static TT_STATUS device_handle(struct dpu_adapter_t *dpu_adapter, struct device_
         }
         else
         {
-            dpu_error("invalid device type, please help check \n");
+            dpu_info(ERROR_LEVEL,"invalid device type, please help check \n");
         }
         goto end;
     }
@@ -1847,7 +1873,7 @@ static TT_STATUS device_handle(struct dpu_adapter_t *dpu_adapter, struct device_
     }
     else
     {
-        dpu_error("invalid device type, please help check \n");
+        dpu_info(ERROR_LEVEL,"invalid device type, please help check \n");
         need_set_device = 0;
     }
 
@@ -1877,7 +1903,7 @@ end:
 
 static void cursor_handle_trace(struct cursor_cmd_t *cursor_cmd)
 {
-    dpu_trace("op %d, op_valid %d  crtc %d crtc_valid %d, type %d, mode %d surface %d s_valid %d \n",
+    dpu_info(TRACE_LEVEL,"op %d, op_valid %d  crtc %d crtc_valid %d, type %d, mode %d surface %d s_valid %d \n",
         cursor_cmd->op,
         cursor_cmd->op_valid,
         cursor_cmd->crtc,
@@ -1887,7 +1913,7 @@ static void cursor_handle_trace(struct cursor_cmd_t *cursor_cmd)
         cursor_cmd->surface_index,
         cursor_cmd->si_valid);
 
-    dpu_trace("pos_x %d pos_y %d pos_valid %d, cmd_index %d  cmd_valid %d list %d info %d help %d\n",
+    dpu_info(TRACE_LEVEL,"pos_x %d pos_y %d pos_valid %d, cmd_index %d  cmd_valid %d list %d info %d help %d\n",
         cursor_cmd->pos_x,
         cursor_cmd->pos_y,
         cursor_cmd->pos_valid,
@@ -1903,14 +1929,14 @@ static void cursor_handle_list(struct dpu_adapter_t *dpu_adapter)
     u32 i = 0;
     struct cursor_cmd_t *cached_cmd = NULL;
 
-    dpu_info("list of cached plane cmd: \n");
+    dpu_info(INFO_LEVEL,"list of cached plane cmd: \n");
     for (i = 0; i < MAX_CACHED_CMD_NUM; i++)
     {
         if (dpu_adapter->cached_cmd[CURSOR_CMD][i].valid)
         {
             cached_cmd = &dpu_adapter->cached_cmd[CURSOR_CMD][i].cursor_cmd;
                  
-            dpu_info("%d: op %s, crtc %d , type %s, mode %s surface %d pos_x %d pos_y %d \n",
+            dpu_info(INFO_LEVEL,"%d: op %s, crtc %d , type %s, mode %s surface %d pos_x %d pos_y %d \n",
                 i,
                 cached_cmd->op ? "enable" : "disable",
                 cached_cmd->crtc,
@@ -1929,7 +1955,7 @@ static void cursor_handle_help()
     u32 i = 0;
     for (i = 0; i < ARRAY_SIZE(cursor_options_table); i++)
     {
-        dpu_info("%s\n", cursor_options_table[i].options_help);
+        dpu_info(INFO_LEVEL,"%s\n", cursor_options_table[i].options_help);
     }
 }
 
@@ -1940,17 +1966,17 @@ static void cursor_handle_info(struct dpu_adapter_t *dpu_adapter)
     
     for (i = 0; i < CRTC_NUM; i++)
     {
-        dpu_info("crtc %d \n",i);
+        dpu_info(INFO_LEVEL,"crtc %d \n",i);
         
         cursor_info = &dpu_adapter->current_cursor_info[i];
 
         if (cursor_info->plane_state == PLANE_DISABLED || !cursor_info->surface)
         {
-            dpu_info("cursor is disabled\n");
+            dpu_info(INFO_LEVEL,"cursor is disabled\n");
         }
         else
         {
-             dpu_info("type %s, mode %s g_addr 0x%x c_addr 0x%x pos_x %d pos_y %d \n",
+             dpu_info(INFO_LEVEL,"type %s, mode %s g_addr 0x%x c_addr 0x%x pos_x %d pos_y %d \n",
                 g_cursor_type_string[cursor_info->type],
                 cursor_info->mode == 1? "64x64" : "128x128",
                 cursor_info->surface->gpu_addr,
@@ -1977,9 +2003,9 @@ static TT_STATUS cursor_handle(struct dpu_adapter_t *dpu_adapter, struct cursor_
 
     cursor_handle_trace(cursor_cmd);
     
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         goto end;
     }
 
@@ -2048,7 +2074,7 @@ static TT_STATUS cursor_handle(struct dpu_adapter_t *dpu_adapter, struct cursor_
         }
         else
         {
-            dpu_error("input crtc index is invalid ,please help check\n");
+            dpu_info(ERROR_LEVEL,"input crtc index is invalid ,please help check\n");
             need_set = 0;
         }
     }
@@ -2072,7 +2098,7 @@ static TT_STATUS cursor_handle(struct dpu_adapter_t *dpu_adapter, struct cursor_
         }
         else
         {
-            dpu_error("input cursor type is invalid ,please help check\n");
+            dpu_info(ERROR_LEVEL,"input cursor type is invalid ,please help check\n");
             need_set = 0;
         }
     }
@@ -2085,7 +2111,7 @@ static TT_STATUS cursor_handle(struct dpu_adapter_t *dpu_adapter, struct cursor_
         }
         else
         {
-            dpu_error("input cursor mode is invalid ,please help check\n");
+            dpu_info(ERROR_LEVEL,"input cursor mode is invalid ,please help check\n");
             need_set = 0;
         }
     }
@@ -2100,7 +2126,7 @@ static TT_STATUS cursor_handle(struct dpu_adapter_t *dpu_adapter, struct cursor_
         }
         else
         {
-            dpu_error("input surface index is invalid ,please help check\n");
+            dpu_info(ERROR_LEVEL,"input surface index is invalid ,please help check\n");
             need_set = 0;
         }
     }
@@ -2161,7 +2187,7 @@ static TT_STATUS cursor_handle(struct dpu_adapter_t *dpu_adapter, struct cursor_
 
         if (DPU_OK != dpu_set_cursor(dpu_adapter->dpu_manager, &cursor_set))
         {
-            dpu_error("set cursor failed ,please help check \n");
+            dpu_info(ERROR_LEVEL,"set cursor failed ,please help check \n");
             ret = TT_FAIL;
             goto end;
         }
@@ -2178,14 +2204,14 @@ static void misc_handle_trace(u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_nu
 {
     u32 i = 0;
 
-    dpu_trace("in misc handle trace\n");
+    dpu_info(TRACE_LEVEL,"in misc handle trace\n");
 
     for (i = 0; i < word_num; i++)
     {
-        dpu_trace("%s ",buffer[i]);
+        dpu_info(TRACE_LEVEL,"%s ",buffer[i]);
     }
 
-    dpu_trace("\n");
+    dpu_info(TRACE_LEVEL,"\n");
 }
 
 
@@ -2201,7 +2227,7 @@ static void handle_pcir(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
     
     if (word_num < 4)
     {
-        dpu_info(" pcir bus dev func  [offset] [value] \n");
+        dpu_info(INFO_LEVEL," pcir bus dev func  [offset] [value] \n");
         return ;
     }
 
@@ -2231,23 +2257,23 @@ static void handle_pcir(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
         {
             //TODO: decode pci space, like lspci format ?
         
-            dpu_info("       0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
+            dpu_info(INFO_LEVEL,"       0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
             for (i = 0; i < 16; i++)
             {
-                dpu_info("0x%02x:",i*16);
+                dpu_info(INFO_LEVEL,"0x%02x:",i*16);
                 for (j = 0; j < 16; j++)
                 {
                     tt_read_pci_config_byte(bus, dev, func, i*16 + j, &value);
-                    dpu_info(" %02x", value);
+                    dpu_info(INFO_LEVEL," %02x", value);
                 }
-                dpu_info("\n");
+                dpu_info(INFO_LEVEL,"\n");
             }
 
         }
         else
         {
             tt_read_pci_config_byte(bus, dev, func, offset, &value);
-            dpu_info("read 0x%x 0x%x 0x%x offset:0x%x value: 0x%x\n", bus, dev, func, offset, value);
+            dpu_info(INFO_LEVEL,"read 0x%x 0x%x 0x%x offset:0x%x value: 0x%x\n", bus, dev, func, offset, value);
         }
     }
      
@@ -2261,7 +2287,7 @@ static void handle_reg(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 
     if (word_num < 2)
     {
-        dpu_info("%s     index   [value]\n", buffer[0]);
+        dpu_info(INFO_LEVEL,"%s     index   [value]\n", buffer[0]);
         return ;
     }
 
@@ -2276,7 +2302,7 @@ static void handle_reg(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         value = tt_read_u32(dpu_adapter, base + index);
     }
 
-    dpu_info("%s  0x%x  value : 0x%x\n", buffer[0], base + index, value);
+    dpu_info(INFO_LEVEL,"%s  0x%x  value : 0x%x\n", buffer[0], base + index, value);
 
 
 
@@ -2302,7 +2328,7 @@ static void handle_reg(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
             value = tt_read_u32(dpu_adapter, base + index);
         }
 
-        dpu_info("%s  0x%x  new   : 0x%x\n", buffer[0], base + index, value);
+        dpu_info(INFO_LEVEL,"%s  0x%x  new   : 0x%x\n", buffer[0], base + index, value);
     }
      
 
@@ -2310,48 +2336,27 @@ static void handle_reg(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 
 static void handle_mem(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num, MISC_OP_TYPE op )
 {
-    u32 offset = 0, value = 0, length = 0, addr = 0;
+    u32 offset = 0, value = 0, length = 0;
+	void *addr = NULL;
     u32 i = 0, j = 0;
 
     if (op == OP_READ && word_num < 2)
     {
-        dpu_info("memr  offset    [length]\n");
+        dpu_info(INFO_LEVEL,"memr  offset    [length]\n");
         return ;
     }
 
     if (op == OP_WRITE && word_num < 3)
     {
-        dpu_info("memw  offset    value  [length]\n");
+        dpu_info(INFO_LEVEL,"memw  offset    value  [length]\n");
         return ;
     }
 
     offset = strtoul(buffer[1], NULL, 16);
     
-    addr = offset + dpu_adapter->base.fb_base;
-    if (op == OP_READ && word_num >= 3)
-    {
-        length = strtoul(buffer[2], NULL, 16);
+    addr = offset + (u8*)dpu_adapter->base.fb_base;
 
-        length = length % 8 ? (length/8 + 1): length /8;  //may read more data
-
-        for (i = 0; i < length; i++)
-        {
-            dpu_info(" 0x%x:",(u32*)addr + i * 8);
-            for (j = 0; j < 8; j ++)
-            {
-                dpu_info("0x%08x ",tt_read_buffer_u32((u32*)(addr) + i * 8 + j));
-            }
-            dpu_info("\n");
-        }
-    }
-    else
-    {
-         value = tt_read_buffer_u32((u32*)addr);
-
-         dpu_info(" 0x%08x :  0x%08x\n", addr, value);
-    }
-
-    if (op == OP_WRITE)
+	if (op == OP_WRITE)
     {
         value = strtoul(buffer[2], NULL, 16);
         if (word_num >= 4)
@@ -2368,8 +2373,28 @@ static void handle_mem(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
             tt_write_buffer_u32(((u32*)(addr) + i), value);
         }
     }
-    
-    
+    else if (op == OP_READ && word_num >= 3)
+    {
+        length = strtoul(buffer[2], NULL, 16);
+
+        length = length % 8 ? (length/8 + 1): length /8;  //may read more data
+
+        for (i = 0; i < length; i++)
+        {
+            dpu_info(INFO_LEVEL," 0x%x:",offset + i * 8);
+            for (j = 0; j < 8; j ++)
+            {
+                dpu_info(INFO_LEVEL,"0x%08x ",tt_read_buffer_u32((u32*)addr + i * 8 + j));
+            }
+            dpu_info(INFO_LEVEL,"\n");
+        }
+    }
+    else
+    {
+         value = tt_read_buffer_u32((u32*)addr);
+         dpu_info(INFO_LEVEL," 0x%08x :  0x%08x\n", addr, value);
+    }
+
 }
 static void handle_dump(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
 {
@@ -2381,7 +2406,7 @@ static void handle_dump(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
     u8  dump_file = 1;
     FILE *fp = NULL;
 
-    dpu_info("reg dump :");
+    dpu_info(INFO_LEVEL,"reg dump :");
 
     if (word_num >=2)
     {
@@ -2429,15 +2454,15 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
     struct dpu_i2c_para_t i2c_para = {0};
 
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         return;
     }
 
     if (word_num < 3)
     {
-        dpu_info("i2c group  addr offset value \n");
+        dpu_info(INFO_LEVEL,"i2c group  addr offset value \n");
         return ;
     }
 
@@ -2466,31 +2491,31 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         i2c_para.rw = 0;
         if (!get_offset)
         {
-            dpu_info("    00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n");
+            dpu_info(INFO_LEVEL,"    00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\n");
             for (i = 0; i < 16; i++)
             {
-                dpu_info("%02x ", i);
+                dpu_info(INFO_LEVEL,"%02x ", i);
                 for (j = 0; j < 16; j++)
                 {
                     i2c_para.offset = i * 16 + j;
                     dpu_i2c_transfer(dpu_adapter->dpu_manager, device, &i2c_para);
 
-                    dpu_info(" %02x", temp);
+                    dpu_info(INFO_LEVEL," %02x", temp);
                     if (i < 8)
                     {
                         sum += temp;
                     }
                 }
-                dpu_info("\n");
+                dpu_info(INFO_LEVEL,"\n");
             }
-            dpu_info("check sum = %02x\n", sum);
+            dpu_info(INFO_LEVEL,"check sum = %02x\n", sum);
         }
         else
         {
             i2c_para.offset = offset;
             
             dpu_i2c_transfer(dpu_adapter->dpu_manager, device, &i2c_para);
-            dpu_info("group 0x%x addr 0x%x offset 0x%x value :0x%x\n", device, addr, offset, temp);
+            dpu_info(INFO_LEVEL,"group 0x%x addr 0x%x offset 0x%x value :0x%x\n", device, addr, offset, temp);
         }
     }
     else //i2c write
@@ -2500,7 +2525,7 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         i2c_para.data = &old;
         
         dpu_i2c_transfer(dpu_adapter->dpu_manager, device, &i2c_para); 
-        //dpu_info("grop 0x%x addr 0x%x offset 0x%x value :0x%x\n",group, addr, offset, temp);
+        //dpu_info(INFO_LEVEL,"grop 0x%x addr 0x%x offset 0x%x value :0x%x\n",group, addr, offset, temp);
 
         i2c_para.rw = 1;
         i2c_para.data = &value;
@@ -2514,7 +2539,7 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 
         if (temp != value)
         {
-            dpu_info("write device 0x%x addr 0x%x offset 0x%x failed,old value is 0x%x now value is 0x%x\n",
+            dpu_info(INFO_LEVEL,"write device 0x%x addr 0x%x offset 0x%x failed,old value is 0x%x now value is 0x%x\n",
                 device,
                 addr,
                 offset,
@@ -2523,7 +2548,7 @@ static void handle_i2c(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         }
         else
         {
-            dpu_info("write device 0x%x addr 0x%x offset 0x%x  value 0x%x successfully\n",
+            dpu_info(INFO_LEVEL,"write device 0x%x addr 0x%x offset 0x%x  value 0x%x successfully\n",
                 device, 
                 addr, 
                 offset, 
@@ -2541,15 +2566,15 @@ static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
     u8  get_value = 0;
 
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         return;
     }
 
     if (word_num < 3)
     {
-        dpu_info("aux port offset value\n");
+        dpu_info(INFO_LEVEL,"aux port offset value\n");
         return ;
     }
 
@@ -2573,7 +2598,7 @@ static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 
         dpu_set_aux(dpu_adapter->dpu_manager, &aux_para);
 
-        dpu_info("read device 0x%x offset 0x%x value :0x%x\n", port, offset, temp);
+        dpu_info(INFO_LEVEL,"read device 0x%x offset 0x%x value :0x%x\n", port, offset, temp);
     }
     else
     {
@@ -2596,7 +2621,7 @@ static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         
         if (temp != value)
         {
-            dpu_info("write port 0x%x offset 0x%x failed,old value is 0x%x now value is 0x%x\n",
+            dpu_info(INFO_LEVEL,"write port 0x%x offset 0x%x failed,old value is 0x%x now value is 0x%x\n",
                 port,
                 offset,
                 old,
@@ -2604,7 +2629,7 @@ static void handle_aux(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
         }
         else
         {
-            dpu_info("write port 0x%x offset 0x%x value 0x%x successfully\n",
+            dpu_info(INFO_LEVEL,"write port 0x%x offset 0x%x value 0x%x successfully\n",
                 port, 
                 offset, 
                 value);
@@ -2622,13 +2647,13 @@ static void handle_file(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
  
     if (op == OP_WRITE && word_num < 3)  //write to mem
     {
-        dpu_info("lf filename offset \n");
+        dpu_info(INFO_LEVEL,"lf filename offset \n");
         return ;
     }
 
     if (op == OP_READ && word_num < 4)
     {
-        dpu_info("sf filename offset size \n");
+        dpu_info(INFO_LEVEL,"sf filename offset size \n");
         return ;
     }
 
@@ -2638,16 +2663,16 @@ static void handle_file(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
     fp = fopen(file_name, "wb+");
     if (!fp)
     {
-        dpu_info("open file %s failed \n",file_name);
+        dpu_info(INFO_LEVEL,"open file %s failed \n",file_name);
         return;
     }     
 
     if (op == OP_READ)
     {
         size = strtoul(buffer[3], NULL, 16);
-        fwrite((void*)(dpu_adapter->base.fb_base + offset), size, 1, fp);
+        fwrite((void*)((u8*)dpu_adapter->base.fb_base + offset), size, 1, fp);
         
-        dpu_info("save to file done\n");
+        dpu_info(INFO_LEVEL,"save to file done\n");
         fclose(fp);
     }
     else
@@ -2656,9 +2681,9 @@ static void handle_file(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
         file_size = ftell(fp);
 
         fseek(fp, 0, SEEK_SET);
-        fread((void*)(dpu_adapter->base.fb_base + offset),file_size, 1, fp);
+        fread((void*)((u8*)dpu_adapter->base.fb_base + offset),file_size, 1, fp);
         
-        dpu_info("load file to offset 0x%x done \n",offset);
+        dpu_info(INFO_LEVEL,"load file to offset 0x%x done \n",offset);
         fclose(fp);
     }
 }
@@ -2666,37 +2691,40 @@ static void handle_file(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
 void handle_help()
 {
 
-    dpu_info("mode    -help  for mode help info\n");
-    dpu_info("plane   -help  for plane help info\n");
-    dpu_info("surface -help  for surface help info\n");
-    dpu_info("device  -help  for device help info\n");
-    dpu_info("cursor  -help  for cursor help info \n");
+    dpu_info(INFO_LEVEL,"mode    -help  for mode help info\n");
+    dpu_info(INFO_LEVEL,"plane   -help  for plane help info\n");
+    dpu_info(INFO_LEVEL,"surface -help  for surface help info\n");
+    dpu_info(INFO_LEVEL,"device  -help  for device help info\n");
+    dpu_info(INFO_LEVEL,"cursor  -help  for cursor help info \n");
 
     
-    dpu_info("\n In misc handle below ,all data is hex\n\n");
+    dpu_info(INFO_LEVEL,"\n In misc handle below ,all data is hex\n\n");
     
-    dpu_info("pcir  bus  dev  func  [offset] [value] \n");
-    dpu_info("cr    index   [value]\n");
-    dpu_info("crb   index   [value]\n");
-    dpu_info("sr    index   [value]\n");
-    dpu_info("srb   index   [value]\n");
-    dpu_info("mmio  index   [value]\n");
-    dpu_info("memr  offset  [length]\n");
-    dpu_info("memw  offset   value [length]\n");
-    dpu_info("dump  [file_name]  dump all regs to console/file\n");
-    dpu_info("i2c   group  addr   offset value \n");
-    dpu_info("aux   port   offset value\n");
-    dpu_info("lf    filename     offset \n");     //TODO: maybe we need surface index ?
-    dpu_info("sf    filename     offset size \n");
-    dpu_info("csc   <path>  <index1>  [index2] \n");
-    dpu_info("  path: 1 :plane csc   index1 = crtc index  index2 = plane index\n");  //plane csc just test csc ? 
+    dpu_info(INFO_LEVEL,"pcir  bus  dev  func  [offset] [value] \n");
+    dpu_info(INFO_LEVEL,"cr    index   [value]\n");
+    dpu_info(INFO_LEVEL,"crb   index   [value]\n");
+    dpu_info(INFO_LEVEL,"sr    index   [value]\n");
+    dpu_info(INFO_LEVEL,"srb   index   [value]\n");
+    dpu_info(INFO_LEVEL,"mmio  index   [value]\n");
+    dpu_info(INFO_LEVEL,"memr  offset  [length]\n");
+    dpu_info(INFO_LEVEL,"memw  offset   value [length]\n");
+    dpu_info(INFO_LEVEL,"dump  [file_name]  dump all regs to console/file\n");
+    dpu_info(INFO_LEVEL,"i2c   group  addr   offset value \n");
+    dpu_info(INFO_LEVEL,"aux   port   offset value\n");
+    dpu_info(INFO_LEVEL,"lf    filename     offset \n");     //TODO: maybe we need surface index ?
+    dpu_info(INFO_LEVEL,"sf    filename     offset size \n");
+    dpu_info(INFO_LEVEL,"csc   <path>  <index1>  [index2] \n");
+    dpu_info(INFO_LEVEL,"  path: 1 :plane csc   index1 = crtc index  index2 = plane index\n");  //plane csc just test csc ? 
                                                                                      //device csc test color enhancement ?
-    dpu_info("  path: 2 :device csc  index1 = port index\n");
-    dpu_info("gamma   <index> <domain> <mode> \n");
-    dpu_info("   index: crtc index \n");
-    dpu_info("   domain: 1: primary only 2: overlay only 3: blend data \n");
-    dpu_info("   mode :  1: 8bit single, 2: 8bit split 3: 10bit single 4: 10bit split \n");
-    dpu_info("q  exit program\n");
+    dpu_info(INFO_LEVEL,"  path: 2 :device csc  index1 = port index\n");
+    dpu_info(INFO_LEVEL,"gamma   <index> <domain> <mode> \n");
+    dpu_info(INFO_LEVEL,"   index: crtc index \n");
+    dpu_info(INFO_LEVEL,"   domain: 1: primary only 2: overlay only 3: blend data \n");
+    dpu_info(INFO_LEVEL,"   mode :  1: 8bit single, 2: 8bit split 3: 10bit single 4: 10bit split \n");
+
+
+	dpu_info(INFO_LEVEL,"check crtc   check hw signature with sw value\n");
+    dpu_info(INFO_LEVEL,"q  exit program\n");
 }
 
 
@@ -2704,15 +2732,15 @@ static void handle_csc(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 {
    struct csc_para_t csc_para = {0};
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         return;
     }
 
    //put csc para to output_info_t
 
-    dpu_info("in handle csc \n");
+    dpu_info(INFO_LEVEL,"in handle csc \n");
 }
 
 
@@ -2720,13 +2748,13 @@ static void handle_gamma(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_
 {
     //test gamma 
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         return;
     }
 
-    dpu_info("in handle gamma \n");
+    dpu_info(INFO_LEVEL,"in handle gamma \n");
 
 }
 
@@ -2734,104 +2762,673 @@ static void handle_hda(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OP
 {
     //How ?
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
-        dpu_info("de is not available\n");
+        dpu_info(INFO_LEVEL,"de is not available\n");
         return;
     }
-    dpu_info("in handle hda\n");
+    dpu_info(INFO_LEVEL,"in handle hda\n");
 }
 
-
-static u8 is_same_str(u8 *str1, u8 *str2)
+static void handle_echo(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
 {
-    if (tt_strhash(str1) == tt_strhash(str2))
-    {
-        return 1;
-    }
-    else
-    {
-        return 0;
-    }
+	u32 i = 1;
+
+	while(i < word_num)
+	{
+		dpu_info(INFO_LEVEL, "%s ",buffer[i]);
+		i++;
+	}
+
+	dpu_info(INFO_LEVEL, "\n");
 }
+
+void get_hw_signature(struct dpu_adapter_t *dpu_adapter, u32 crtc, u64* value)
+{
+	struct hw_signature_t  sig = {0};
+
+	sig.crtc = crtc;
+	dpu_get_hw_signature(dpu_adapter->dpu_manager, &sig);
+
+	*value = sig.value;
+}
+
+TT_STATUS do_signature_compare(struct dpu_adapter_t *dpu_adapter, u32 crtc, u32 sw_value)
+{
+	u32 i = 3;
+	u64 hw_value = 0;
+
+	get_hw_signature(dpu_adapter, crtc, &hw_value);
+
+	while(--i && sw_value != hw_value)
+	{
+		tt_delay_micro_seconds(17);
+		get_hw_signature(dpu_adapter, crtc, &hw_value);
+	}
+
+	if (i == 0)
+	{
+		dpu_info(ERROR_LEVEL, "Signature check failed  !!!\n");
+		return TT_FAIL;
+	}
+	else
+	{
+		dpu_info(ERROR_LEVEL, "Signature check successed\n");
+
+		return TT_PASS;
+	}
+
+}
+
+
+
+void prepare_cmodel_args(struct dpu_adapter_t *dpu_adapter, struct cmodel_args_t *args, struct de_hw_env_t *hw_env)
+{
+	u32 size = 0;
+
+	memset(args, 0, sizeof(struct cmodel_args_t));
+
+	args->plane_info[0] = &dpu_adapter->current_plane_info[args->crtc][0];
+	args->plane_info[1] = &dpu_adapter->current_plane_info[args->crtc][1];
+
+	args->cursor_info = &dpu_adapter->current_cursor_info[args->crtc];
+
+	if (hw_env->iwin.iwin_en)
+	{
+		size = hw_env->iwin.height * hw_env->iwin.width * sizeof(struct bus_1010108);
+		args->iwin= tt_malloc_mem(size);
+	}
+
+	size = dpu_adapter->current_crtc_info[args->crtc].adjust_mode.hactive * 
+			dpu_adapter->current_crtc_info[args->crtc].adjust_mode.vactive * sizeof(struct bus_1010108);
+	args->background =  tt_malloc_mem(size);
+
+	if (hw_env->spl[0].spl_en)
+	{
+		args->spl_input_src[0] = (u8*)(dpu_adapter->base.fb_base + hw_env->spl[0].gpu_addr);
+		size = args->plane_info[0]->src_w * args->plane_info[0]->src_h * sizeof(struct bus_1010108); 
+		args->spl_input_dst[0] =  tt_malloc_mem(size); //need check input module	s
+		size = args->plane_info[0]->dst_w * args->plane_info[0]->dst_h * sizeof(struct bus_1010108);
+		args->spl_scl_dst[0] = tt_malloc_mem(size);
+		args->spl_csc_dst[0] = tt_malloc_mem(size);
+	}
+
+	if (hw_env->spl[1].spl_en)
+	{
+		args->spl_input_src[1] = (u8*)(dpu_adapter->base.fb_base + hw_env->spl[1].gpu_addr);
+		size = args->plane_info[1]->src_w * args->plane_info[1]->src_h * sizeof(struct bus_1010108);
+		args->spl_input_dst[1] = tt_malloc_mem(size);
+		size = args->plane_info[1]->dst_w * args->plane_info[1]->dst_h * sizeof(struct bus_1010108);
+		args->spl_scl_dst[1] = tt_malloc_mem(size);
+		args->spl_csc_dst[1] = tt_malloc_mem(size);
+	}
+
+
+	if(hw_env->cur.cur_en)
+	{
+		args->cur_input_src = dpu_adapter->current_cursor_info[args->crtc].surface->cpu_addr;
+		//should be big enough
+		size = args->cursor_info->surface->width * args->cursor_info->surface->height * 4; 
+		args->cur_input_dst = tt_malloc_mem(size);
+		args->cur_csc_dst = tt_malloc_mem(size);   //need consider x_off ,y_off ???
+	}
+	
+	//lut,csc, dither size is destination window ,right ?
+	size = dpu_adapter->current_crtc_info[args->crtc].adjust_mode.hactive * 
+			dpu_adapter->current_crtc_info[args->crtc].adjust_mode.vactive * sizeof(struct bus_1010108);
+	args->pipe_pu_dst = tt_malloc_mem(size);
+	args->pipe_lut_dst = tt_malloc_mem(size);
+	args->pipe_csc_dst = tt_malloc_mem(size);
+	args->pipe_dither_dst = tt_malloc_mem(size);
+
+	args->dest_win_w = dpu_adapter->current_crtc_info[args->crtc].adjust_mode.hactive;
+	args->dest_win_h = dpu_adapter->current_crtc_info[args->crtc].adjust_mode.vactive;
+
+}
+
+void release_cmodel_res(struct cmodel_args_t  *args)
+{
+	tt_free_mem(args->iwin);
+	tt_free_mem(args->background);
+	//tt_free_mem(args->spl_input_src[0]);
+	//tt_free_mem(args->spl_input_src[1]);
+	tt_free_mem(args->spl_input_dst[0]);
+	tt_free_mem(args->spl_input_dst[1]);
+	tt_free_mem(args->spl_scl_dst[0]);
+	tt_free_mem(args->spl_scl_dst[1]);
+	tt_free_mem(args->spl_csc_dst[0]);
+	tt_free_mem(args->spl_csc_dst[1]);
+	tt_free_mem(args->cur_csc_dst);
+	//tt_free_mem(args->cur_input_src);
+	tt_free_mem(args->cur_input_dst);
+	tt_free_mem(args->pipe_pu_dst);
+	tt_free_mem(args->pipe_dither_dst);
+	tt_free_mem(args->pipe_lut_dst);
+	tt_free_mem(args->pipe_csc_dst);
+	
+}
+
+void prepare_input_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct input_para_t * para, u32 pipe)
+{
+	memset(para, 0, sizeof(struct input_para_t ));
+
+	para->stride = hw_env->spl[pipe].stride;
+	para->spl_abgr = hw_env->spl[pipe].abgr;
+	para->spl_crycb = hw_env->spl[pipe].crycb;
+	para->spl_cbycry = hw_env->spl[pipe].cbycry;
+	para->pix_off = hw_env->spl[pipe].pix_off;
+	para->spl_fmt = hw_env->spl[pipe].spl_fmt;
+
+	para->src = (unsigned short * )args->spl_input_src[pipe];
+	para->dst = (unsigned short * )args->spl_input_dst[pipe];
+
+	para->width = args->plane_info[pipe]->src_w;
+	para->height = args->plane_info[pipe]->src_h;
+
+
+}
+
+
+void prepare_curosr_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct cursor_para_t *para)
+{
+	memset(para, 0, sizeof(struct cursor_para_t ));
+
+
+	para->src = (unsigned short*)args->cur_input_src;
+	para->dst = (unsigned short*)args->cur_input_dst;
+	para->panel_width = hw_env->iwin.width;
+	para->panel_height = hw_env->iwin.height;
+	para->x_start = hw_env->cur.x_start;
+	para->y_start =	hw_env->cur.y_start;
+	para->x_off =  hw_env->cur.x_offset;
+	para->y_off = hw_env->cur.y_offset;
+	para->cur_size = hw_env->cur.cur_size;
+	para->cur_type = hw_env->cur.cur_type;
+	para->cur_mono_bg = hw_env->cur.mono_bg;
+	para->cur_mono_fg = hw_env->cur.mono_fg;
+}
+
+void prepare_scl_stream_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct scl_stream_para_t *para, u32 pipe)
+{
+	memset(para, 0, sizeof(struct scl_stream_para_t ));
+
+
+	para->src_w = hw_env->spl[pipe].src_w;
+	para->src_h = hw_env->spl[pipe].src_h;
+	para->dst_w = hw_env->spl[pipe].dst_w;
+	para->dst_h = hw_env->spl[pipe].dst_h;
+
+
+    para->is_cos_h = hw_env->spl[pipe].is_cos_h;
+    para->is_cos_v = hw_env->spl[pipe].is_cos_v;
+    para->is_alpha_ups = hw_env->spl[pipe].is_alpha_ups;
+    para->is_v_duplicate = hw_env->spl[pipe].is_v_duplicate;
+    para->keyl = hw_env->spl[pipe].keyl;
+    para->keyh = hw_env->spl[pipe].keyh;
+    para->key_mode = (pipe == 0) ? hw_env->ovl.ovl0_key_mode : hw_env->ovl.ovl1_key_mode;
+    para->h_acc = hw_env->spl[pipe].hacc;
+    para->v_acc = hw_env->spl[pipe].vacc;
+
+	para->src = (unsigned short*)args->spl_input_dst[pipe];
+	para->dst = (unsigned short*)args->spl_scl_dst[pipe];
+
+}
+
+void prepare_csc_plane_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct csc_plane_para_t *para, u32 pipe)
+{
+	memset(para, 0, sizeof(struct csc_plane_para_t ));
+
+	para->width = hw_env->spl[pipe].dst_w;
+	para->height = hw_env->spl[pipe].dst_h;
+
+	para->infmt = hw_env->spl[pipe].csc.input_fmt;
+	para->outfmt = hw_env->spl[pipe].csc.output_fmt;
+	para->bright = hw_env->spl[pipe].csc.bright;
+
+	para->prog = hw_env->spl[pipe].csc.prog;
+
+	para->coef1 = hw_env->spl[pipe].csc.coef1;
+	para->coef2 = hw_env->spl[pipe].csc.coef2;
+	para->coef3 = hw_env->spl[pipe].csc.coef3;
+	para->coef4 = hw_env->spl[pipe].csc.coef4;
+	para->coef5 = hw_env->spl[pipe].csc.coef5;
+	para->coef6 = hw_env->spl[pipe].csc.coef6;
+	para->coef7 = hw_env->spl[pipe].csc.coef7;
+	para->coef8 = hw_env->spl[pipe].csc.coef8;
+	para->coef9 = hw_env->spl[pipe].csc.coef9;
+
+	para->src = (unsigned short*)args->spl_scl_dst[pipe];
+	para->dst = (unsigned short*)args->spl_csc_dst[pipe];
+	
+
+}
+
+void prepare_csc_cursor_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct csc_cursor_para_t *para, i32 out_w, i32 out_h)
+{
+	memset(para, 0, sizeof(struct csc_cursor_para_t ));
+	
+	para->width = out_w;
+	para->height = out_h;
+
+	para->fmt = hw_env->cur.out_fmt;
+
+	para->src =(unsigned short*)args->cur_input_dst;
+	para->dst =(unsigned short*)args->cur_csc_dst;
+
+
+}
+
+
+
+void prepare_overlay_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct overlay_para_t *para, u32 out_w, u32 out_h)
+{
+	memset(para, 0, sizeof(struct overlay_para_t ));
+
+
+	
+	para->ovl0_key_mode = hw_env->ovl.ovl0_key_mode;
+	para->ovl0_pla_fct = hw_env->ovl.ovl0_kp;
+	para->ovl0_plb_fct = hw_env->ovl.ovl0_ks;
+	para->ovl0_bld_mode = hw_env->ovl.ovl0_bld_mode;
+	para->ovl0_is_inv_alpha = hw_env->ovl.ovl0_inv_alpha;
+	para->ovl0_plane_alpha_val = hw_env->ovl.ovl0_plane_alpha;
+	para->ovl0_alpha_key_sel = hw_env->ovl.ovl0_alpha_key_sel;
+	para->ovl0_color_key_sel = hw_env->ovl.ovl0_color_key_sel;
+	para->ovl0_is_alpha_rang = hw_env->ovl.ovl0_is_alpha_rang;
+	para->ovl0_is_mdi_sec = hw_env->spl[0].spl_sec;
+	para->ovl0_is_ref_int = hw_env->itg.spl_ref_iwin;
+	para->ovl0_is_ycbcr = hw_env->spl[0].csc.output_fmt > 1 ? 1 : 0;
+	
+	para->ovl1_key_mode = hw_env->ovl.ovl1_key_mode;
+	para->ovl1_pla_fct = hw_env->ovl.ovl1_kp;
+	para->ovl1_plb_fct = hw_env->ovl.ovl1_ks;
+	para->ovl1_bld_mode = hw_env->ovl.ovl1_bld_mode;
+	para->ovl1_is_inv_alpha = hw_env->ovl.ovl1_inv_alpha;
+	para->ovl1_plane_alpha_val = hw_env->ovl.ovl1_plane_alpha;
+	para->ovl1_alpha_key_sel = hw_env->ovl.ovl1_alpha_key_sel;
+	para->ovl1_color_key_sel = hw_env->ovl.ovl1_color_key_sel;
+	para->ovl1_is_alpha_rang = hw_env->ovl.ovl1_is_alpha_rang;
+	para->ovl1_is_mdi_sec = hw_env->spl[1].spl_sec;
+	para->ovl1_is_ref_int = hw_env->itg.spl_ref_iwin;
+	para->ovl1_is_ycbcr =  hw_env->spl[1].csc.output_fmt > 1 ? 1 : 0;
+
+	if (hw_env->spl[0].spl_en)
+	{
+		para->win_0_start_x = hw_env->spl[0].start_x;
+		para->win_0_start_y = hw_env->spl[0].start_y;
+		para->win_0_width = hw_env->spl[0].dst_w;
+		para->win_0_height = hw_env->spl[0].dst_h;
+	}
+	else
+	{
+		para->win_0_start_x = 1;
+		para->win_0_start_y = 1;
+		para->win_0_width = 0;
+		para->win_0_height = 0;
+	}
+
+	if (hw_env->spl[1].spl_en)
+	{
+		para->win_1_start_x = hw_env->spl[1].start_x;
+		para->win_1_start_y = hw_env->spl[1].start_y;
+		para->win_1_width = hw_env->spl[1].dst_w;
+		para->win_1_height = hw_env->spl[1].dst_h;
+	}
+
+	if (hw_env->cur.cur_en)
+	{
+		para->win_cur_start_x = hw_env->cur.x_start;
+		para->win_cur_start_y = hw_env->cur.y_start;
+		para->win_cur_width = out_w;
+		para->win_cur_height = out_h;
+	}
+	else
+	{
+		para->win_cur_start_x = 1;
+		para->win_cur_start_y = 1;
+		para->win_cur_width = 0;
+		para->win_cur_height = 0;
+	}
+
+	para->bg_color = hw_env->ovl.bg_color;
+	para->bg_ycbcr = hw_env->ovl.bg_ycbcr;
+
+	para->win0_src = (unsigned short*)args->spl_csc_dst[0];
+	para->win1_src = (unsigned short*)args->spl_csc_dst[1];
+	para->cur_src = (unsigned short*)args->cur_csc_dst;
+
+	para->cur_type = hw_env->cur.cur_type;
+	para->is_curs_ycbcr = hw_env->cur.out_fmt > 1 ? 1 : 0;
+	para->is_curs_ref_int = hw_env->itg.cur_ref_iwin;
+
+	para->iwin_start_x = hw_env->iwin.start_x;
+	para->iwin_start_y = hw_env->iwin.start_y;
+
+	para->dst_width = args->dest_win_w;
+	para->dst_height = args->dest_win_h;
+
+	para->dst = (unsigned short*)args->background;
+
+}
+
+void prepare_scl_panel_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct scl_panel_para_t* para)
+{
+	memset(para, 0, sizeof(struct scl_panel_para_t ));
+
+	para->src_w = hw_env->iwin.width;
+	para->src_h = hw_env->iwin.height;
+	para->dst_w = hw_env->pu.pus_width_dst;
+	para->dst_h = hw_env->pu.pus_height_dst;
+
+	para->start_x = hw_env->iwin.start_x;
+	para->start_y = hw_env->iwin.start_y;
+
+	para->panel_width = args->dest_win_w;
+	para->panel_height = args->dest_win_h;
+
+	para->en = hw_env->pu.pus_en;
+    para->h_en = hw_env->pu.pus_hen;
+    para->v_en = hw_env->pu.pus_ven;
+    para->h_acc = hw_env->pu.pus_ratio_h;
+    para->v_acc = hw_env->pu.pus_ration_v;
+
+    para->is_cos = hw_env->pu.pus_cos2tap;
+    para->is_hw_ratio = hw_env->pu.pus_ration_mode;
+    para->ratio_plus = hw_env->pu.pus_ratio_plus;
+
+	para->bg_color = hw_env->ovl.bg_color;
+
+	para->src = (unsigned short *)args->background;
+	para->dst = (unsigned short *)args->pipe_pu_dst;
+
+}
+
+void prepare_lut_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct lut_para_t *para)
+{
+	memset(para, 0, sizeof(struct lut_para_t ));
+
+	para->width = args->dest_win_w;
+	para->height = args->dest_win_h;
+		
+	para->lut_en = hw_env->lut.lut_lut_en;
+	para->lut_intp_on = hw_env->lut.lut_intp_on;
+	para->lut_bitwidth = hw_env->lut.lut_bitwidth;
+	
+	memcpy(para->lut_data, hw_env->lut.lut_data, 256 * sizeof(unsigned int));
+
+	para->src = (unsigned short*)args->pipe_pu_dst;
+	para->dst = (unsigned short*)args->pipe_lut_dst;
+
+}
+
+
+void prepare_dither_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct dither_para_t *para)
+{
+	memset(para, 0, sizeof(struct dither_para_t ));
+
+	para->width = args->dest_win_w;
+	para->height = args->dest_win_h;
+
+	para->dither_en = hw_env->dither.dither_en;
+	para->dist_en = hw_env->dither.dither_dist_en;
+	para->base = hw_env->dither.dither_base;
+	para->bitsel = hw_env->dither.dither_bitsel;
+
+	para->src = (unsigned short*)args->pipe_csc_dst;
+	para->dst = (unsigned short*)args->pipe_dither_dst;
+}
+
+
+void prepare_csc_panel_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct csc_plane_para_t *para)
+{
+	memset(para, 0, sizeof(struct csc_plane_para_t ));
+
+	para->width = args->dest_win_w;
+	para->height = args->dest_win_h;
+
+	para->infmt = hw_env->pipe_csc.input_fmt;
+	para->outfmt = hw_env->pipe_csc.output_fmt;
+	para->bright = hw_env->pipe_csc.bright;
+
+	para->prog = hw_env->pipe_csc.prog;
+
+	para->coef1 = hw_env->pipe_csc.coef1;
+	para->coef2 = hw_env->pipe_csc.coef2;
+	para->coef3 = hw_env->pipe_csc.coef3;
+	para->coef4 = hw_env->pipe_csc.coef4;
+	para->coef5 = hw_env->pipe_csc.coef5;
+	para->coef6 = hw_env->pipe_csc.coef6;
+	para->coef7 = hw_env->pipe_csc.coef7;
+	para->coef8 = hw_env->pipe_csc.coef8;
+	para->coef9 = hw_env->pipe_csc.coef9;
+
+	para->src = (unsigned short*)args->pipe_lut_dst;
+	para->dst = (unsigned short*)args->pipe_csc_dst;
+
+
+}
+
+void prepare_signature_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct signature_para_t *para)
+{
+	memset(para, 0, sizeof(struct signature_para_t ));
+
+	para->width = args->dest_win_w;
+	para->height = args->dest_win_h;
+
+	para->src = (unsigned short*)args->pipe_dither_dst;
+}
+
+
+TT_STATUS do_dpu_process(struct dpu_adapter_t *dpu_adapter, u32 crtc, u64* sw_sig)
+{
+	TT_STATUS ret = TT_PASS;
+	struct de_hw_env_t hw_env = {0};
+	struct cmodel_args_t  args = {0};
+	struct input_para_t input_para ={0};
+	struct cursor_para_t cursor_para = {0};
+	struct scl_stream_para_t  scl_stream_para = {0};
+	struct csc_plane_para_t  csc_plane_para = {0};
+	struct csc_cursor_para_t csc_cursor_para = {0};
+	struct overlay_para_t    overlay_para = {0};
+	struct scl_panel_para_t  scl_panel_para = {0};
+
+	struct lut_para_t 	lut_para = {0};
+	struct dither_para_t dither_para = {0};
+	struct signature_para_t signature_para = {0};
+
+	i32_t out_h, out_w;
+
+	hw_env.crtc = crtc;
+	dpu_get_hw_env(dpu_adapter->dpu_manager, &hw_env);
+
+	args.crtc = crtc;
+	prepare_cmodel_args(dpu_adapter, &args, &hw_env);
+
+	if (hw_env.spl[0].spl_en)
+	{
+		prepare_input_args(&args, &hw_env, &input_para, 0);
+		input_wrapper(&input_para); 
+		prepare_scl_stream_args(&args, &hw_env, &scl_stream_para, 0);
+		scl_stream_wrapper(&scl_stream_para);
+		prepare_csc_plane_args(&args, &hw_env, &csc_plane_para, 0);
+	    csc_plane_wrapper(&csc_plane_para);
+	}
+
+	if (hw_env.spl[1].spl_en)
+	{
+		prepare_input_args(&args, &hw_env, &input_para, 1);
+		input_wrapper(&input_para);
+		prepare_scl_stream_args(&args, &hw_env, &scl_stream_para, 1);
+		scl_stream_wrapper(&scl_stream_para);
+		prepare_csc_plane_args(&args, &hw_env, &csc_plane_para, 1);
+		csc_plane_wrapper(&csc_plane_para);
+	}
+
+	if (hw_env.cur.cur_en)
+	{
+		prepare_curosr_args(&args, &hw_env, &cursor_para);
+		cursor_wrapper(&cursor_para, &out_w, &out_h);
+
+		prepare_csc_cursor_args(&args, &hw_env, &csc_cursor_para, out_w, out_h);
+		csc_cursor_wrapper(&csc_cursor_para);
+	}
+
+	//overlay bg,spl0,spl1,cursor together to  bg layer
+	prepare_overlay_args(&args, &hw_env, &overlay_para, out_w, out_h);
+	overlay_wrapper(&overlay_para);
+
+	prepare_scl_panel_args(&args, &hw_env, &scl_panel_para);
+	//if pu is diable ,will copy src to dst
+	scl_panel_wrapper(&scl_panel_para);
+
+	prepare_lut_args(&args, &hw_env, &lut_para);
+	//pass lut, will copy src to dst
+	lut_wrapper(&lut_para);
+
+	prepare_csc_panel_args(&args, &hw_env, &csc_plane_para);
+	//can't bypass csc,  translate src to dst
+	csc_plane_wrapper(&csc_plane_para);
+
+	prepare_dither_args(&args, &hw_env, &dither_para);
+	//pass dither, will copy src to dst
+	dither_wrapper(&dither_para);
+
+	prepare_signature_args(&args, &hw_env, &signature_para);
+	*sw_sig = signature_wrapper(&signature_para);
+
+	dpu_info(INFO_LEVEL,"get cmodel signature %lld\n", *sw_sig);
+
+
+	release_cmodel_res(&args);
+ 
+}
+
+
+static TT_STATUS handle_check_signature(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
+{
+	u32  crtc = 0 ;
+	TT_STATUS ret = TT_PASS;
+	u64  sw_sig = 0;
+
+
+	if (word_num >= 2)
+	{
+		crtc = strtoul(buffer[1], NULL, 10);
+
+		if (crtc > CRTC_NUM)
+		{
+			dpu_info(ERROR_LEVEL," invalid crtc index %d\n",crtc);
+			return TT_FAIL;
+		}
+	}
+	else
+	{
+		dpu_info(ERROR_LEVEL, "need crtc index \n");
+		return TT_FAIL;
+	}
+
+	ret = do_dpu_process(dpu_adapter, crtc, &sw_sig);
+	if (ret != TT_PASS)
+	{
+		dpu_info(ERROR_LEVEL, "dpu cmodel process failed \n");
+		goto end;
+	}
+
+	//ret = do_signature_compare(dpu_adapter, crtc, sw_sig);
+
+end:
+	return ret;
+
+}
+
 
 static TT_STATUS misc_handle(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
 {
-
+	TT_STATUS ret = TT_PASS;
     misc_handle_trace(buffer, word_num);
 
-    if (is_same_str("pcir", buffer[0]))
+    if (tt_is_same_str("pcir", buffer[0]))
     {
         handle_pcir(dpu_adapter, buffer, word_num);
     }
-    else if (is_same_str("mmio", buffer[0]))
+    else if (tt_is_same_str("mmio", buffer[0]))
     {
         handle_reg(dpu_adapter, buffer, word_num, MMIO_BASE, 0xffffffff);
     }
-    else if (is_same_str("cr", buffer[0]))
+    else if (tt_is_same_str("cr", buffer[0]))
     {
         handle_reg(dpu_adapter, buffer, word_num, CR_BASE, 0xff);
     }
-    else if (is_same_str("crb", buffer[0]))
+    else if (tt_is_same_str("crb", buffer[0]))
     {
         handle_reg(dpu_adapter, buffer, word_num, CR_B_BASE, 0xff);
     }
-    else if (is_same_str("sr", buffer[0]))
+    else if (tt_is_same_str("sr", buffer[0]))
     {
         handle_reg(dpu_adapter, buffer, word_num, SR_BASE, 0xff);
     }
-    else if (is_same_str("srb", buffer[0]))
+    else if (tt_is_same_str("srb", buffer[0]))
     {
         handle_reg(dpu_adapter, buffer, word_num, SR_B_BASE, 0xff);
     }
-    else if (is_same_str("memr", buffer[0]))
+    else if (tt_is_same_str("memr", buffer[0]))
     {
         handle_mem(dpu_adapter, buffer, word_num, OP_READ);
     }
-    else if (is_same_str("memw", buffer[0]))
+    else if (tt_is_same_str("memw", buffer[0]))
     {
         handle_mem(dpu_adapter, buffer, word_num, OP_WRITE);
     }
-    else if (is_same_str("dump", buffer[0]))
+    else if (tt_is_same_str("dump", buffer[0]))
     {
         handle_dump(dpu_adapter, buffer, word_num);
     }
-    else if (is_same_str("i2c", buffer[0]))
+    else if (tt_is_same_str("i2c", buffer[0]))
     {
         handle_i2c(dpu_adapter, buffer, word_num);
     }
-    else if (is_same_str("aux", buffer[0]))
+    else if (tt_is_same_str("aux", buffer[0]))
     {
         handle_aux(dpu_adapter, buffer, word_num);
     }
-    else if (is_same_str("lf", buffer[0]))
+    else if (tt_is_same_str("lf", buffer[0]))
     {
         handle_file(dpu_adapter, buffer, word_num, OP_WRITE);
     }
-    else if (is_same_str("sf", buffer[0]))
+    else if (tt_is_same_str("sf", buffer[0]))
     {
         handle_file(dpu_adapter, buffer, word_num, OP_READ);
     }
-    else if (is_same_str("help", buffer[0]))
+    else if (tt_is_same_str("help", buffer[0]))
     {
         handle_help(dpu_adapter, buffer, word_num);
     }
-    else if (is_same_str("csc", buffer[0]))
+    else if (tt_is_same_str("csc", buffer[0]))
     {
         handle_csc(dpu_adapter, buffer, word_num);
     }
-    else if (is_same_str("gamma", buffer[0]))
+    else if (tt_is_same_str("gamma", buffer[0]))
     {
         handle_gamma(dpu_adapter, buffer, word_num);
     }
-    else if (is_same_str("hda", buffer[0]))
+    else if (tt_is_same_str("hda", buffer[0]))
     {
         handle_hda(dpu_adapter, buffer, word_num);
     }
+	else if (tt_is_same_str("echo", buffer[0]))
+	{
+		handle_echo(dpu_adapter, buffer, word_num);
+	}
+	else if (tt_is_same_str("check", buffer[0]))
+	{
+		ret = handle_check_signature(dpu_adapter, buffer, word_num);
+	}
     else
     {
-        dpu_error("unknow misc operation :%s  \n",buffer[0]);
+        dpu_info(ERROR_LEVEL,"unknow misc operation :%s  \n",buffer[0]);
     }
+
+	return ret;
 
 }
 
@@ -2854,7 +3451,7 @@ static u32 dump_cmd_history(struct dpu_adapter_t *dpu_adapter)
 
     for (i = 0; i < MAX_INPUT_HISTORY_NUM; i++)
     {
-        dpu_info("\n index %d is %s %d\n",i, dpu_adapter->cmd_history[i], strlen(dpu_adapter->cmd_history[i]));
+        dpu_info(INFO_LEVEL,"\n index %d is %s %d\n",i, dpu_adapter->cmd_history[i], strlen(dpu_adapter->cmd_history[i]));
     }
 
 }
@@ -2885,14 +3482,17 @@ static u32 add_to_cmd_history(struct dpu_adapter_t *dpu_adapter, u8* cmd)
 
 void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
 {
-    u32 i;
     u8 ch;
     u8 *position = NULL;
     i32 up_times = 0;
     u32 use_input = 0;
     u32 cache_cmd_index = 0;
+	u32 i;
 
-    dpu_info(">");
+
+    dpu_info(INFO_LEVEL,">");
+
+	//dpu_info(INFO_LEVEL,">");
 
    // dump_cmd_history(dpu_adapter);
   
@@ -2900,27 +3500,51 @@ void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
     do{
 
         ch = getch();
+		//dpu_info(INFO_LEVEL,"ch is  0x%x	 ",ch);
 
-        //dpu_info("ch is %d ",ch);
-
+#ifdef __LINUX__
         if(ch == KEY_UP_DOWN_PRE)
         {
-            tt_delay_micro_seconds(300);
-            continue;
+        	ch = getch();
+           	if (ch == 91)   // 27  91  65/66 on linux
+           	{
+				ch = getch();
+
+				if(ch == 65)
+				{
+					ch = KEY_UP;
+				}
+				else if (ch == 66)
+				{
+					ch = KEY_DOWN;
+				}
+				else
+			    {
+					continue;
+				}
+		    }
+		    else if (ch == 27)  //need type twice
+			{
+				ch = KEY_ESC;
+			}
+			else
+		    {
+		    	continue;
+		    }
         }
 
+#endif
         if (ch == KEY_UP)
         {
-          //  dpu_info("in key up \n");
             up_times ++;
             i = position - cmd_line;
 
             while (i > 0)
             {
                 *position = '\0';
-                dpu_info("%c", KEY_BACKSPACE);
-                dpu_info("%c", KEY_SPACE);
-                dpu_info("%c", KEY_BACKSPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_BACKSPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_SPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_BACKSPACE);
                 i--;
                 position--;
             }
@@ -2930,21 +3554,20 @@ void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
             strcpy(cmd_line, dpu_adapter->cmd_history[cache_cmd_index]);
             position = cmd_line + strlen(cmd_line);
 
-            dpu_info("%s",cmd_line);
+            dpu_info(INFO_LEVEL,"%s",cmd_line);
            
         }
         else if (ch == KEY_DOWN)
         {
-        // dpu_info("in key down \n");
             up_times --;
             i = position - cmd_line;
 
             while (i > 0)
             {
                 *position = '\0';
-                dpu_info("%c", KEY_BACKSPACE);
-                dpu_info("%c", KEY_SPACE);
-                dpu_info("%c", KEY_BACKSPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_BACKSPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_SPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_BACKSPACE);
                 i--;
                 position--;
             }
@@ -2954,9 +3577,9 @@ void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
             strcpy(cmd_line, dpu_adapter->cmd_history[cache_cmd_index]);
             position = cmd_line + strlen(cmd_line);
 
-            dpu_info("%s",cmd_line);
+            dpu_info(INFO_LEVEL,"%s",cmd_line);
         }
-        else if ((ch != KEY_ENTER) && (ch != KEY_BACKSPACE) && (ch != KEY_ESC))
+        else if ((ch != KEY_ENTER) && (ch != KEY_BACKSPACE) && (ch != KEY_ESC) && (ch != 127))
         {
             *position = ch;
             position ++;
@@ -2964,12 +3587,11 @@ void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
 
             use_input = 1;
             
-            dpu_info("%c", ch);
+            dpu_info(INFO_LEVEL,"%c", ch);
         }
-        else if (ch == KEY_BACKSPACE)
+        else if (ch == 127 || ch == KEY_BACKSPACE)
         {
             i = position - cmd_line;
-
             if (position > cmd_line)
             {
                 position --;
@@ -2978,28 +3600,26 @@ void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
  
             if (i > 0)
             {
-                dpu_info("%c", KEY_BACKSPACE);
-                dpu_info("%c", KEY_SPACE);
-                dpu_info("%c", KEY_BACKSPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_BACKSPACE); //0x8
+                dpu_info(INFO_LEVEL,"%c", KEY_SPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_BACKSPACE);
             }
         }
-        else if (ch == KEY_ESC)
-  //clear all cmd_line
+        else if (ch == KEY_ESC)//clear all cmd_line
         {
             i = position - cmd_line;
 
             while (i > 0)
             {
                 *position = '\0';
-                dpu_info("%c", KEY_BACKSPACE);
-                dpu_info("%c", KEY_SPACE);
-                dpu_info("%c", KEY_BACKSPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_BACKSPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_SPACE);
+                dpu_info(INFO_LEVEL,"%c", KEY_BACKSPACE);
                 i--;
                 position--;
             }
             //position = cmd_line;
         }
-       // printf("ch is %d\n",ch);       
     }while(ch != KEY_ENTER);
 
     *position = '\0';
@@ -3008,175 +3628,155 @@ void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
     {
        // dump_cmd_history(dpu_adapter);
         add_to_cmd_history(dpu_adapter, cmd_line);
-        //dpu_info("\n lei ,add to cmd_line is %s  %d\n", cmd_line, strlen(cmd_line));
+        //dpu_info(INFO_LEVEL,"\n  ,add to cmd_line is %s  %d\n", cmd_line, strlen(cmd_line));
 
         //dump_cmd_history(dpu_adapter);
     }
-
-
-    dpu_info("\n");
+    dpu_info(INFO_LEVEL,"\n");
 }
 
+
+TT_STATUS do_exec_cmd(struct dpu_adapter_t *dpu_adapter, u8 str[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
+{
+	struct options_table *table;
+	struct support_cmd *command = NULL;
+	void* cmd = NULL;
+	u8   found = 0;
+
+	u32   support_cmd_num = 0;
+	u32   i = 0, j = 0 ,k = 0;
+	u32   item_num = 0;
+
+	TT_STATUS ret = TT_PASS;
+
+	support_cmd_num = ARRAY_SIZE(g_support_cmd);
+
+	i = 0;
+	found = 0;
+	while(i < support_cmd_num)
+	{
+	    if (!strcmp(str[0], g_support_cmd[i].cmd_name))
+	    {
+	        command = &g_support_cmd[i];
+	        
+	        found = 1;
+	        break;
+	    }
+	    i++;
+	}
+
+	if (!found)
+	{
+	    ret = misc_handle(dpu_adapter, str, word_num);
+	}
+	else
+	{
+	    memset(command->cmd, 0 , command->cmd_size);
+	
+
+		item_num = command->options_item_num;
+
+		found = 0;
+		for (i = 1; i < word_num; i++)
+		{
+		    for (j = 0; j < item_num; j++)
+		    {
+		        if (str[i][0] == '-' && !strcmp(&str[i][1], command->table[j].options_name))
+		        {          
+		            k = 0;
+		            if(command->table[j].options_num == 0)
+		            {
+		                
+		                if(command->table[j].para[k].valid_flag)
+		                {
+		                    *(command->table[j].para[k].valid_flag) = 1;
+		                }
+		            }
+		            else
+		            {
+		                k = 0;
+		                while(k < command->table[j].options_num)
+		                {
+		                    ++i;
+		                    *(command->table[j].para[k].value) = strtoul(str[i], NULL, command->table[j].para[k].base);
+
+		                    if(command->table[j].para[k].valid_flag)
+		                    {
+		                        *(command->table[j].para[k].valid_flag) = 1;
+		                    }
+
+		                    k++;
+		                }
+		            }
+
+		            found = 1;
+		            break;
+		        }
+		    }
+		}
+
+		if (found)
+		{
+		    ret = command->func(dpu_adapter, command->cmd);	
+		}
+		else
+		{
+			ret = TT_FAIL;
+		}
+	}
+
+	return ret;
+
+}
 void process_cmd(struct dpu_adapter_t *dpu_adapter)
 {
     TT_STATUS ret = TT_PASS;
-    struct options_table *table;
-
-    void* cmd = NULL;
-    u8   found = 0;
-
-    u32   support_cmd_num = 0;
-    u32   i = 0, j = 0 ,k = 0;
-    u32   item_num = 0;
-    u32   word_num = 0;
+ 
+	u32 	word_num = 0;
+    u8   	cmd_line[MAX_CMD_STRING_NUM];
+    u8   	str[50][MAX_CMD_OPTION_NAME_SIZE];
 
 
-    u8   cmd_line[MAX_CMD_STRING_NUM];
-    u8   str[50][MAX_CMD_OPTION_NAME_SIZE];
-    u8   ch;
-    u8   *word;
-    u8   filter[] = " ,\t\n";
+	//
+	do_script_exec(dpu_adapter);
 
-    struct support_cmd *command = NULL;
-
-
-
-    dpu_adapter->cmd_num = 0;
-
-    for (i = 0; i < MAX_INPUT_HISTORY_NUM; i++)
-    {
-        memset(dpu_adapter->cmd_history[i], '\0', MAX_CMD_STRING_NUM);
-    }
 
     while(1)
     {
         memset(cmd_line, 0 , MAX_CMD_STRING_NUM);
 
-        memset(str, 0, 50*MAX_CMD_OPTION_NAME_SIZE);
+        memset(str, 0, 50 * MAX_CMD_OPTION_NAME_SIZE);
 
         get_input(dpu_adapter, cmd_line);
 
-        #if 0
-        //dpu_info(">");
-        //putchar('>');
-        i = 0;
-        ch = getchar();
-        do{
-            cmd_line[i] = ch;
-            i++;
-            ch = getchar();
-        }while(ch != KEY_ENTER);
+		ret = tt_get_words(cmd_line, &word_num, str);
 
-        cmd_line[i] = '\0';
-        #endif
-        word = strtok(cmd_line, filter);
-   
-        if(word != NULL)
-        {
-            strcpy(str[0], word);
-        }
-        else
-        {
-            continue;
-        }
+		if (ret != TT_PASS)
+		{
+			break;
+		}
 
-        if (str[0][0] == 'q' || str[0][0] == 'Q')
-        {
-            break;
-        }
+		if (word_num == 0)
+		{
+			continue;
+		}
 
-        i = 1;
-        while(word != NULL)
-        {
-            word = strtok(NULL, filter);
-            if(word != NULL)
-            {
-                strcpy(str[i], word);
-                i++;
-            }
-        }
-        word_num = i;
+        ret = do_exec_cmd(dpu_adapter, str, word_num);
 
-        support_cmd_num = ARRAY_SIZE(g_support_cmd);
+		if (ret != TT_PASS)
+		{
+			int i = 0;
 
-        i = 0;
-        found = 0;
-        while(i < support_cmd_num)
-        {
-            if (!strcmp(str[0],g_support_cmd[i].cmd_name))
-            {
-                command = &g_support_cmd[i];
-                
-                found = 1;
-                break;
-            }
-            i++;
-        }
+			dpu_info(ERROR_LEVEL, "run cmd failed :");
+			while(i < word_num)
+			{
+				dpu_info(ERROR_LEVEL,"%s ",str[i]);
+				i++;
+			}
+			dpu_info(ERROR_LEVEL,"\n");
+		}
 
-        if (!found)
-        {
-            ret = misc_handle(dpu_adapter, str, word_num);
-            continue;
-        }
-        else
-        {
-            memset(command->cmd, 0 , command->cmd_size);
-        }
-      
-        item_num = command->options_item_num;
-
-        found = 0;
-        for (i = 1; i < word_num; i++)
-        {
-            for (j = 0; j < item_num; j++)
-            {
-                if (str[i][0] == '-' && !strcmp(&str[i][1], command->table[j].options_name))
-                {          
-                    k = 0;
-                    if(command->table[j].options_num == 0)
-                    {
-                        
-                        if(command->table[j].para[k].valid_flag)
-                        {
-                            *(command->table[j].para[k].valid_flag) = 1;
-                        }
-                    }
-                    else
-                    {
-                        k = 0;
-                        while(k < command->table[j].options_num)
-                        {
-                            ++i;
-                            *(command->table[j].para[k].value) = strtoul(str[i], NULL, command->table[j].para[k].base);
-
-                            if(command->table[j].para[k].valid_flag)
-                            {
-                                *(command->table[j].para[k].valid_flag) = 1;
-                            }
-
-                            k++;
-                        }
-                    }
-
-                    found = 1;
-                    break;
-                }
-            }
-        }
-        
-        if (found)
-        {
-            ret = command->func(dpu_adapter, command->cmd);
-            if (ret != TT_PASS)
-            {
-                dpu_error("run cmd failed, please help check \n");
-            }
-        }
-        else
-        {
-            dpu_info("invalid command please help check \n");
-        }
-   }//while(1)
+   }
    
 }
 
@@ -3188,7 +3788,7 @@ void main()
     u32 i = 0, j = 0;
     struct dpu_adapter_t  dpu_adapter = {0};
 
-    dpu_info("in main func \n");
+    dpu_info(INFO_LEVEL,"in main func \n");
 
 
     dpu_adapter.num_crtc = 3;

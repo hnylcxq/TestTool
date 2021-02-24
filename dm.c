@@ -5,9 +5,8 @@
 #include<string.h>
 
 //所有call cbios 的interface 都需要走这里下去，相当于disp层，做参数转换的。
-
-
 //display manager is a simple layer
+
 
 i32 dm_set_callback()
 {
@@ -58,48 +57,49 @@ i32 dm_init_sw(struct dpu_adapter_t *dpu_adapter)
 
     memset(&sw_init_para, 0, sizeof(struct dpu_init_sw_para_t));
 
-    sw_init_para.dpu_cb.cb_print                  = (void*)temp_print;
-    sw_init_para.dpu_cb.cb_delay_us         = (void*)tt_delay_micro_seconds;
-    sw_init_para.dpu_cb.cb_read_u8                 = (void*)tt_read_u8;
-    sw_init_para.dpu_cb.cb_read_u16                = (void*)tt_read_u16;
-    sw_init_para.dpu_cb.cb_read_u32                 = (void*)tt_read_u32;
-    sw_init_para.dpu_cb.cb_write_u8                = (void*)tt_write_u8;
-    sw_init_para.dpu_cb.cb_write_u16               = (void*)tt_write_u16;
+    sw_init_para.dpu_cb.cb_print                  	= (void*)dpu_info;
+    sw_init_para.dpu_cb.cb_delay_us         		= (void*)tt_delay_micro_seconds;
+    sw_init_para.dpu_cb.cb_read_u8                 	= (void*)tt_read_u8;
+    sw_init_para.dpu_cb.cb_read_u16                	= (void*)tt_read_u16;
+    sw_init_para.dpu_cb.cb_read_u32                	= (void*)tt_read_u32;
+    sw_init_para.dpu_cb.cb_write_u8               	= (void*)tt_write_u8;
+    sw_init_para.dpu_cb.cb_write_u16               	= (void*)tt_write_u16;
     sw_init_para.dpu_cb.cb_write_u32                = (void*)tt_write_u32;
-    sw_init_para.dpu_cb.cb_read_io             = (void*)tt_read_io;
-    sw_init_para.dpu_cb.cb_write_io            = (void*)tt_write_io;
-    sw_init_para.dpu_cb.cb_alloc_mem    = (void*)tt_malloc_mem;
-    sw_init_para.dpu_cb.cb_free_mem                  = (void*)tt_free_mem;
-    sw_init_para.dpu_cb.cb_create_spin_lock = NULL;
-    sw_init_para.dpu_cb.cb_destory_spin_lock = NULL;
-    sw_init_para.dpu_cb.cb_spin_lock = NULL;
-    sw_init_para.dpu_cb.cb_spin_unlock = NULL;
-    sw_init_para.dpu_cb.cb_create_mutex = NULL;
-    sw_init_para.dpu_cb.cb_destory_mutex = NULL;
-    sw_init_para.dpu_cb.cb_mutex_lock = NULL;
-    sw_init_para.dpu_cb.cb_mutex_unlock = NULL;
+    //sw_init_para.dpu_cb.cb_read_io             		= (void*)tt_read_io;
+    //sw_init_para.dpu_cb.cb_write_io            		= (void*)tt_write_io;
+    sw_init_para.dpu_cb.cb_alloc_mem   	            = (void*)tt_malloc_mem;
+    sw_init_para.dpu_cb.cb_free_mem                 = (void*)tt_free_mem;
+    sw_init_para.dpu_cb.cb_create_spin_lock 		= NULL;
+    sw_init_para.dpu_cb.cb_destory_spin_lock 		= NULL;
+    sw_init_para.dpu_cb.cb_spin_lock 				= NULL;
+    sw_init_para.dpu_cb.cb_spin_unlock 				= NULL;
+    sw_init_para.dpu_cb.cb_create_mutex 			= NULL;
+    sw_init_para.dpu_cb.cb_destory_mutex 			= NULL;
+    sw_init_para.dpu_cb.cb_mutex_lock 				= NULL;
+    sw_init_para.dpu_cb.cb_mutex_unlock 			= NULL;
 
-    sw_init_para.dpu_cb.cb_strcmp                    = (void*)strcmp;
-    sw_init_para.dpu_cb.cb_strcpy                    = (void*)strcpy;
-    sw_init_para.dpu_cb.cb_strncmp                   = (void*)strncmp;
-    sw_init_para.dpu_cb.cb_memset                    = (void*)memset;
-    sw_init_para.dpu_cb.cb_memcpy                    = (void*)memcpy;
-    sw_init_para.dpu_cb.cb_memcmp                    = (void*)memcmp;
-    sw_init_para.dpu_cb.cb_do_div = NULL;
-    sw_init_para.dpu_cb.cb_vsprintf                  = (void*)vsprintf;
-    sw_init_para.dpu_cb.cb_vsnprintf                 = (void*)vsnprintf;
+    sw_init_para.dpu_cb.cb_strcmp                   = (void*)strcmp;
+    sw_init_para.dpu_cb.cb_strcpy                   = (void*)strcpy;
+    sw_init_para.dpu_cb.cb_strncmp                  = (void*)strncmp;
+    sw_init_para.dpu_cb.cb_memset                   = (void*)memset;
+    sw_init_para.dpu_cb.cb_memcpy                   = (void*)memcpy;
+    sw_init_para.dpu_cb.cb_memcmp                   = (void*)memcmp;
+    sw_init_para.dpu_cb.cb_do_div 					= NULL;
+    sw_init_para.dpu_cb.cb_vsprintf                 = (void*)vsprintf;
+    sw_init_para.dpu_cb.cb_vsnprintf                = (void*)vsnprintf;
 
     sw_init_para.chip_revision          = dpu_adapter->base.revision_id;
-    sw_init_para.device_id             = 0x5348;//dpu_adapter->base.device_id;
-    sw_init_para.vender_id            = dpu_adapter->base.vender_id;
-    sw_init_para.is_mamm_primary = dpu_adapter->base.flags.is_primary; 
-    //sw_init_para.GeneralChipID   = 0x3A04;
+    sw_init_para.device_id             	= 0x5348;//dpu_adapter->base.device_id;
+    sw_init_para.vender_id            	= dpu_adapter->base.vender_id;
+    sw_init_para.is_mamm_primary 		= dpu_adapter->base.flags.is_primary; 
+	sw_init_para.dpu_adapter 			= dpu_adapter;
 
     sw_init_para.mmio_base = dpu_adapter->base.mmio_base;
 
-    sw_init_para.is_qt_test = FALSE;
+    sw_init_para.is_qt_test = dpu_adapter->flags.run_on_qt;
 
     dpu_adapter->dpu_manager = dpu_mgr_init(&sw_init_para);
+	printf("dpu_adapter->dpu_manager  is %p \n",dpu_adapter->dpu_manager );
 
     return 0;
 }
@@ -225,7 +225,7 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
 	while (device) {
 		temp = tt_get_last_bit(device);
 		device &= ~temp;
-		dpu_info("device 0x%x %s\n", temp, (devDetect.connected_device & temp) ? "connected" : "not detect");
+		dpu_info(INFO_LEVEL,"device 0x%x %s\n", temp, (devDetect.connected_device & temp) ? "connected" : "not detect");
 	}
 }
 
@@ -250,7 +250,7 @@ void_t dm_deinit_output(struct dpu_adapter_t *dpu_adapter)
 void init_dm(struct dpu_adapter_t *dpu_adapter)
 {
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
         return;
     }
@@ -269,7 +269,7 @@ void init_dm(struct dpu_adapter_t *dpu_adapter)
 
 void deinit_dm(struct dpu_adapter_t *dpu_adapter)
 {
-	if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+	if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
 	{
 		return;
 	}

@@ -1,0 +1,16 @@
+    void dump_spl_win_vld(const tag_base* data);
+    void dump_sups_vwin_vld(const tag_base* data);
+    void dump_sups_hwin_vld(const tag_base* data);
+    void dump_sups_config_done(const tag_base* data);
+    void dump_cur_vld(const tag_base* data);
+    void dump_cur_csc_vld(const tag_base* data);
+    void dump_scsc_in_win_vld(const tag_base* data);
+    void dump_scsc_config_done(const tag_base* data);
+    void dump_ovl_in_de(const tag_base* data);
+    void dump_ovl_config(const tag_base* data);
+    void dump_pus_in_de(const tag_base* data);
+    void dump_pus_config(const tag_base* data);
+    void dump_lut_if(const tag_base* data);
+    void dump_lut_config(const tag_base* data);
+    void dump_dihter_in_de(const tag_base* data);
+    void dump_dither_config(const tag_base* data);

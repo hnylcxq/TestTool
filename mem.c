@@ -148,7 +148,7 @@ void video_heap_init(struct mem_segment_t * segment)
     }
     else
     {
-        dpu_error("%s: fatal error ,mem allocate faild\n",__func__);
+        dpu_info(ERROR_LEVEL,"%s: fatal error ,mem allocate faild\n",__func__);
     }
 }
 
@@ -161,7 +161,7 @@ u32  alloc_video_mem(struct mem_segment_t *segment, u32 size, u32 aligment)
 
     if (segment->free.size < size)
     {
-        dpu_error("%s: no enough video memory \n", __func__);
+        dpu_info(ERROR_LEVEL,"%s: no enough video memory \n", __func__);
         return 0;
     }
 
@@ -195,7 +195,7 @@ u32  alloc_video_mem(struct mem_segment_t *segment, u32 size, u32 aligment)
             temp_1 = (struct list_block*)malloc(sizeof(struct list_block));
             if (!temp_1)
             {
-                dpu_error("%s: allocate list node failed \n",__func__);
+                dpu_info(ERROR_LEVEL,"%s: allocate list node failed \n",__func__);
                 offset = 0;
                 break;
             }
@@ -250,24 +250,24 @@ void dump_segment(struct mem_segment_t *segment)
     struct list_block* temp = NULL;
     u32 i = 0;
 
-    dpu_info("\n free list : size is 0x%x ,num is 0x%x \n",segment->free.size,segment->free.num);
+    dpu_info(INFO_LEVEL,"\n free list : size is 0x%x ,num is 0x%x \n",segment->free.size,segment->free.num);
 
     list_for_each_entry(temp, struct list_block, &segment->free.list, list_item)
     {
         i++;
-        dpu_error("Note%d:  offset is 0x%x aligned_offset is 0x%x size is 0x%x\n", i, temp->offset, temp->aligned_offset, temp->size);
+        dpu_info(ERROR_LEVEL,"Note%d:  offset is 0x%x aligned_offset is 0x%x size is 0x%x\n", i, temp->offset, temp->aligned_offset, temp->size);
     }
 
-    dpu_info("\n busy list : size is 0x%x ,num is 0x%x \n",segment->busy.size,segment->busy.num);
+    dpu_info(INFO_LEVEL,"\n busy list : size is 0x%x ,num is 0x%x \n",segment->busy.size,segment->busy.num);
 
     i = 0;
     list_for_each_entry(temp, struct list_block, &segment->busy.list, list_item)
     {
         i++;
-        dpu_info("Note%d:  offset is 0x%x aligned_offset is 0x%x size is 0x%x\n", i, temp->offset, temp->aligned_offset, temp->size);
+        dpu_info(INFO_LEVEL,"Note%d:  offset is 0x%x aligned_offset is 0x%x size is 0x%x\n", i, temp->offset, temp->aligned_offset, temp->size);
     }
 
-    dpu_info("\n");
+    dpu_info(INFO_LEVEL,"\n");
 }
 
 

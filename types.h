@@ -33,14 +33,26 @@ typedef enum _MISC_OP_TYPE
 
 
 #define KEY_ESC                     (0x1B)
-#define KEY_BACKSPACE               (0x08)
-#define KEY_ENTER                   (0xD)
+
+//#define KEY_ENTER                   (0xD)
 #define KEY_SPACE                   (32)
 #define KEY_UP                      (72)
 #define KEY_DOWN                    (80)
 #define KEY_LEFT                    (75)
 #define KEY_RIGHT                   (77)
-#define KEY_UP_DOWN_PRE             (0)
+#define KEY_BACKSPACE               (0x08)
+
+
+
+#ifdef __LINUX__
+#define   KEY_ENTER   				0x0A
+#define   KEY_UP_DOWN_PRE			27
+
+#else
+#define   KEY_ENTER 				0x0D
+#define KEY_UP_DOWN_PRE         	(0)
+
+#endif
 
 
 
@@ -319,8 +331,8 @@ struct surface_info_t
     u32    range_type;         //TODO
     SURFACE_PATTERN   pattern;
 
-    u32    gpu_addr;
-    u32    cpu_addr;
+    void*    gpu_addr;
+    void*    cpu_addr;
 
     u8     alpha;
  
@@ -619,7 +631,7 @@ struct device_cmd_t
     u32     config_cmd;
     u32     list_cmd;
     u32     help_cmd;
-	u32 info_cmd;
+	u32     info_cmd;
 
 
     
@@ -706,9 +718,12 @@ struct base_adapter_t
 	u8 	    bus_num;
 	u8 	    dev_num;
 	u8  	func_num;
-	
-	u32 	mmio_base;
-	u32 	fb_base;
+
+	u64   	mmio_phy;
+	u64   	fb_phy;
+	void* 	mmio_base;
+	u32		mmio_size;
+	void* 	fb_base;
     u32     fb_size;
 	u32	    hda_base;
 	
@@ -728,9 +743,10 @@ struct base_adapter_t
 
 };
 
-#define TEST_DE             0x1
-#define TEST_DOS_ONLY       0x2
-#define TEST_DE_WITH_QT     0x4
+
+#define TEST_WITHOUT_DE     		0x1
+#define TEST_DE             		0x2
+#define TEST_DE_WITH_REAL_CHIP     	0x4
 
 struct dpu_adapter_t
 {
@@ -738,7 +754,7 @@ struct dpu_adapter_t
 	
 	struct dpu_crtc_caps_t crtc_caps;
 
-    u32     test_domain;   //TEST_DE, TEST_DOS_ONLY, TEST_DE_WITH_QT
+    u32     test_domain;   //TEST_DE, TEST_WITHOUT_DE, TEST_DE_WITH_REAL_CHIP
     
     u32 	num_output;
 	u32 	support_device;
@@ -770,6 +786,8 @@ struct dpu_adapter_t
     u32     cmd_num;
     
     u32     log_level; //control log output
+
+	u8	*	script_name;
     
 	union
 	{
@@ -783,6 +801,156 @@ struct dpu_adapter_t
 
 };
 
+
+
+
+
+
+struct dither_t
+{
+    BOOL 	en;
+    u32 	rgb_src;
+    u32 	rgb_dst;
+    u32 	rgb_op;
+    u32 	alpha_src;
+    u32 	alpha_dst;
+    u32 	alpha_op;
+    u32 	bld_color;
+};
+struct cursor_t
+{
+    BOOL 	en;
+    BOOL	is_cbcr;
+    
+};
+struct scaler_t
+{
+    BOOL 	en;
+    BOOL 	h_en, v_en;
+    BOOL 	is_cos_h;
+    BOOL 	is_cos_v;
+    BOOL 	is_alpha_ups;
+    BOOL 	is_color_key;
+    BOOL 	is_v_duplicate;
+    u32 	keyl;
+    u32 	keyh;
+    u32 	key_mode;
+    u32 	h_acc;
+    u32 	v_acc;
+
+    BOOL 	is_cos;
+    BOOL 	is_hw_ratio;
+    BOOL 	ratio_plus;
+};
+struct overlay_t
+{
+    BOOL 	en;
+    BOOL 	efuse_sec;
+    BOOL 	itg_hden;
+    BOOL 	itg_vden;
+    u32 	key_mode_0;
+    u32 	pla_fct_0;
+    u32 	plb_fct_0;
+    u32 	bld_mode_0;
+    BOOL 	is_inv_alpha_0;
+    u32 	plane_alpha_val_0;
+    u32 	alpha_key_sel_0;
+    u32 	color_key_sel_0;
+    BOOL 	is_alpha_rang_0;
+    u32 	key_mode_1;
+    u32 	pla_fct_1;
+    u32 	plb_fct_1;
+    u32 	bld_mode_1;
+    BOOL 	is_inv_alpha_1;
+    u32 	plane_alpha_val_1;
+    u32 	alpha_key_sel_1;
+    u32 	color_key_sel_1;
+    BOOL 	is_alpha_rang_1;
+    BOOL 	is_mdi_sec_0;
+    BOOL 	is_ycbcr_0;
+    BOOL 	is_mdi_sec_1;
+    BOOL 	is_ycbcr_1;
+    u32 	curs_ovl_tp;
+    BOOL 	curs_ycbcr;
+    BOOL 	is_ref_int_c;
+    BOOL 	is_ref_int_0;
+    BOOL 	is_ref_int_1;
+};
+struct csc_t
+{
+    BOOL 	src_rgb; ///< RGB or YCbCr source.
+    BOOL 	dst_rgb; ///< RGB or YCbCr destination.
+    BOOL 	src_range_full; ///< Full or limited range for source.
+    BOOL 	dst_range_full; ///< Full or limited range for destination.
+    u8      gamut[20]; ///< Gamut name.
+    i32 	bright_drv; ///< Programmable brightness offset (actual value).
+    u32 	infmt; ///< Input format index.
+    u32 	outfmt; ///< Output format index.
+    u32 	bright; ///< Programmable brightness offset (fixed point value).
+    BOOL 	prog; ///< Programmable matrix and brightness offset.
+    u32 	coefs[3][3]; ///< 3x3 matrix coefficients.
+};
+struct dpu_drv_para_t
+{
+	struct cursor_t cursor;
+    struct scaler_t scl;
+    struct overlay_t ovl;
+    struct dither_t dither;
+    struct csc_t csc_plane;
+    struct csc_t csc_cursor;
+    u32 	bg_color;
+    BOOL 	bg_ycbcr;
+};
+
+
+struct bus_1010108 
+{
+    u64		 BV : 10;
+    u64 	GU : 10;
+    u64 	RY : 10;
+    u64 	A : 8;
+    u64 	is_color_key : 1;
+    u64 	is_alpha_key : 1;
+    u64 	is_ycbcr : 1; 
+    u64 	is_valid : 1; //internal usage
+};
+
+struct cmodel_args_t
+{
+	u32_t   crtc;
+
+	struct  plane_info_t    *plane_info[2];
+	struct  cursor_info_t   *cursor_info;
+	u8 		*iwin;
+	u32_t	iwin_size; //in bytes
+	u8 		*background;
+	u32_t 	bg_size;
+
+	u8 		*spl_input_src[2];
+	u32_t 	spl_input_src_size[2];
+	u8 		*spl_input_dst[2];
+	u32_t   spl_input_dst_size[2];
+	
+
+	u8 		*spl_scl_dst[2];
+	u32_t    spl_scl_dst_size[2];
+
+
+	u8 		*cur_input_src;
+	u8 		*cur_input_dst;
+
+
+	u8 		*spl_csc_dst[2];
+	u8 		*cur_csc_dst;
+
+	u8 		*pipe_pu_dst;
+	u8 		*pipe_lut_dst;
+	u8 		*pipe_csc_dst;
+	u8 		*pipe_dither_dst;
+
+	u32  	dest_win_w;
+	u32	 	dest_win_h;
+};
 
 
 #endif

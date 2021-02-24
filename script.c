@@ -8,12 +8,6 @@
 
 
 
-#define SCRIPT_ARRAY_MAX_NUM  50
-#define SCRIPT_LINE_MAX_NUM   256
-#define SCRIPT_LINE_MAX_WORD_NUM    50
-#define SCRIPT_MAX_WORD_SIZE   32
-
-
 
 
 typedef enum
@@ -83,18 +77,7 @@ struct script_manager_t
 };
 
 
-BOOL is_comment(u8 words[][SCRIPT_MAX_WORD_SIZE])
-{
-    BOOL ret = FALSE;
-    
-    if (words[0][0] == '#')
-    {
-        ret = TRUE;
-    }
 
-    return ret;
-    
-}
 
 BOOL is_assignment(u8 words[][SCRIPT_MAX_WORD_SIZE])
 {
@@ -189,7 +172,7 @@ BOOL do_assignment(struct script_manager_t *sm, u8 words[][SCRIPT_MAX_WORD_SIZE]
 
     if (word_num < 3)
     {
-        dpu_error("please help check assignment code about %s %d\n",words[0],word_num);
+        dpu_info(ERROR_LEVEL," please help check assignment code about %s %d\n", words[0], word_num);
         ret = FALSE;
         goto end;
     }
@@ -207,14 +190,14 @@ BOOL do_assignment(struct script_manager_t *sm, u8 words[][SCRIPT_MAX_WORD_SIZE]
 
         list_add_tail(&node->node, &sm->var_list);
 
-        //dpu_debug("get var  %s = %s\n",words[0], node->origin_string[0]);
+        //dpu_info(DEBUG_LEVEL,"get var  %s = %s\n",words[0], node->origin_string[0]);
 
     }
     else
     {
         num = get_array_noi(words[0]);
 
-        //dpu_debug("array num is %d\n",num);
+        //dpu_info(DEBUG_LEVEL,"array num is %d\n",num);
 
         node->type = VAR_TYPE_ARRAY;
         node->scope = VAR_SCOPE_GLOBAL;
@@ -224,19 +207,19 @@ BOOL do_assignment(struct script_manager_t *sm, u8 words[][SCRIPT_MAX_WORD_SIZE]
         if (word_num != (2 + num))  //array name  and " = "
         {
             ret = FALSE;
-            dpu_error("array's num is mismatch with it's values \n");
+            dpu_info(ERROR_LEVEL,"array's num is mismatch with it's values \n");
             goto end;
         }
 
-        //dpu_debug("get array %s, member num is %d value is :\n", words[0], num);
+        //dpu_info(DEBUG_LEVEL,"get array %s, member num is %d value is :\n", words[0], num);
 
         for (i = 0; i < num; i ++)
         {
             strcpy(node->origin_string[i], words[i + 2]);
-            //dpu_debug("%s ",node->origin_string[i]);
+            //dpu_info(DEBUG_LEVEL,"%s ",node->origin_string[i]);
         }
 
-        //dpu_info("\n");
+        //dpu_info(INFO_LEVEL,"\n");
 
         list_add_tail(&node->node, &sm->var_list);
     }
@@ -276,21 +259,21 @@ BOOL handle_loop_start(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_S
 
     if (word_num != 4)
     {
-        dpu_error("please check for loop control \n");
+        dpu_info(ERROR_LEVEL,"please check for loop control \n");
         return FALSE;
     }
 
     var = calloc(1, sizeof(struct variant_node_t));
     if (!var)
     {
-        dpu_error("failed to malloc var node\n");
+        dpu_info(ERROR_LEVEL,"failed to malloc var node\n");
         goto end_1;
     }
 
     code = calloc(1, sizeof(struct code_node_t));
     if (!code)
     {
-        dpu_error("failed to malloc code node\n");
+        dpu_info(ERROR_LEVEL,"failed to malloc code node\n");
         goto end;
     }
 
@@ -298,7 +281,7 @@ BOOL handle_loop_start(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_S
     //handle count var       
     strcpy(var->name, words[1]);
 
-    dpu_debug("add count %s\n",var->name);
+    dpu_info(DEBUG_LEVEL,"add count %s\n",var->name);
 
     var->num = 2;
     var->scope = VAR_SCOPE_LOCAL;
@@ -321,11 +304,11 @@ BOOL handle_loop_start(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_S
 
     if (code->start > code->end)
     {
-        dpu_error("error loop counter setting \n");
+        dpu_info(ERROR_LEVEL,"error loop counter setting \n");
         while(1);
     }
 
-    //dpu_debug("%s start %d  end %d \n",code->count_name, code->start, code->end);
+    //dpu_info(DEBUG_LEVEL,"%s start %d  end %d \n",code->count_name, code->start, code->end);
 
     list_add_tail(&code->node, &sm->exec_list);
 
@@ -364,7 +347,7 @@ struct variant_node_t * find_var(struct script_manager_t* sm, u8* var_name)
     u8 find = 0;
     struct variant_node_t * temp = NULL;
 
-    //dpu_debug("try to find %s \n",var_name); 
+    //dpu_info(DEBUG_LEVEL,"try to find %s \n",var_name); 
     
     list_for_each_entry(temp, struct variant_node_t, &sm->var_list, node)
     {
@@ -434,12 +417,12 @@ void replace_string(u8* dst, u8 *src, u32 name_size, u8 is_array)
             dst[i] = src[i];
         }
 
-       // dpu_debug("length is %d name_size is %d\n",length, name_size);
+       // dpu_info(DEBUG_LEVEL,"length is %d name_size is %d\n",length, name_size);
 
         i = 0;
         while (dst[name_size + i])
         {
-          //  dpu_debug("i is %d dst is %c\n",i,dst[name_size +i]);
+          //  dpu_info(DEBUG_LEVEL,"i is %d dst is %c\n",i,dst[name_size +i]);
             dst[length + i] = dst[name_size + i];
             i++;
         }
@@ -472,7 +455,7 @@ BOOL replace_var(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], 
     u8 var_name[SCRIPT_MAX_WORD_SIZE];
 
     //the most complex case: $array1[$array[5]]
-    //dpu_debug("in replace var word_num is %d\n", word_num);
+    //dpu_info(DEBUG_LEVEL,"in replace var word_num is %d\n", word_num);
 
     for (i = 0; i < word_num; i++)
     {
@@ -483,7 +466,7 @@ BOOL replace_var(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], 
         {
             continue;
         }
-       // dpu_debug("i is %d size is %d\n",i, size);
+       // dpu_info(DEBUG_LEVEL,"i is %d size is %d\n",i, size);
         memset(var_name, '\0', SCRIPT_MAX_WORD_SIZE);
         
         for(j = size - 1; j >= 0; j--)
@@ -497,7 +480,7 @@ BOOL replace_var(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], 
                     get_var_name(var_name, temp);
                     index = get_array_noi(temp);
 
-                    //dpu_debug("find array var : %s\n",var_name);
+                    //dpu_info(DEBUG_LEVEL,"find array var : %s\n",var_name);
 
                     var = find_var(sm, var_name);
 
@@ -508,7 +491,7 @@ BOOL replace_var(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], 
                     get_var_name(var_name, temp);
                     var = find_var(sm, var_name);
 
-                    //dpu_debug("find int var : %s\n",var_name);
+                    //dpu_info(DEBUG_LEVEL,"find int var : %s\n",var_name);
 
                     replace_string(&words[i][j], var->origin_string[0], strlen(var->name), 0); 
                 }
@@ -517,24 +500,38 @@ BOOL replace_var(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], 
     }
 }
 
-void do_normal_exec(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], u32 word_num, u32 depth, u32 exec)
+extern TT_STATUS do_exec_cmd(struct dpu_adapter_t *dpu_adapter, u8 str[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num);
+
+
+TT_STATUS do_normal_exec(struct dpu_adapter_t *dpu_adapter, struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], u32 word_num, u32 depth, u32 exec)
 {
     struct code_node_t *node;
     i32 i = 0;
+	TT_STATUS ret = TT_PASS;
 
     if (exec)
     {
         replace_var(sm, words, word_num);
 
-#if 1 //SCRIPT_DEBUG
+#if 0
         for (i = 0; i < word_num; i ++)
         {
-            dpu_info("%s ",words[i]);
+            dpu_info(INFO_LEVEL,"%s ",words[i]);
         }
-        //dpu_info("depth is %d \n",depth);
-        dpu_info("\n");
+       // dpu_info(INFO_LEVEL,"depth is %d \n",depth);
+        dpu_info(INFO_LEVEL,"\n");
 
-#endif        
+#else 
+
+		ret = do_exec_cmd(dpu_adapter, words, word_num);
+
+		if (ret != TT_PASS)
+		{
+			dpu_info(ERROR_LEVEL, "script exec failed, please help check\n"); 
+			return ret;
+		}
+#endif
+
     }
     else
     {
@@ -542,7 +539,7 @@ void do_normal_exec(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE
 
         if (!node)
         {
-            dpu_error("malloc code node faild \n");
+            dpu_info(ERROR_LEVEL,"malloc code node faild \n");
             while(1);
         }
 
@@ -558,6 +555,8 @@ void do_normal_exec(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE
         list_add_tail(&node->node, &sm->exec_list);
     }
 
+	return ret;
+
 }
 
 void  print_codes(struct script_manager_t* sm)
@@ -566,28 +565,28 @@ void  print_codes(struct script_manager_t* sm)
     u8 i = 0;
 
 
-    dpu_info("\nprint all the code in exec_list \n\n");
+    dpu_info(INFO_LEVEL,"\nprint all the code in exec_list \n\n");
     list_for_each_entry(node, struct code_node_t, &sm->exec_list, node)
     {
 
         if (node->type == CODE_TYPE_LOOP_START)
         {
-            dpu_info("addr %p: depth %d,  for %s %d %d\n", node, node->depth, node->count_name, node->start, node->end);
+            dpu_info(INFO_LEVEL,"addr %p: depth %d,  for %s %d %d\n", node, node->depth, node->count_name, node->start, node->end);
         }
 
         if (node->type == CODE_TYPE_LOOP_END)
         {
-            dpu_info("addr %p: depth %d,  done \n",node, node->depth);
+            dpu_info(INFO_LEVEL,"addr %p: depth %d,  done \n",node, node->depth);
         }
 
         if (node->type == CODE_TYPE_NORMAL)
         {
-            dpu_info("addr %p: depth %d,  ", node, node->depth);
+            dpu_info(INFO_LEVEL,"addr %p: depth %d,  ", node, node->depth);
             for(i = 0; i < node->word_num; i++)
             {
-                dpu_info("%s ", node->code[i]);
+                dpu_info(INFO_LEVEL,"%s ", node->code[i]);
             }
-            dpu_info("\n");
+            dpu_info(INFO_LEVEL,"\n");
         }
     }
 }
@@ -617,11 +616,12 @@ struct code_node_t* find_end(struct script_manager_t *sm, struct code_node_t* st
     }
 }   
 
-BOOL exec_loop_body(struct script_manager_t* sm, struct code_node_t *start, struct code_node_t *end, u32 depth)
+TT_STATUS exec_loop_body(struct dpu_adapter_t *dpu_adapter, struct script_manager_t* sm, struct code_node_t *start, struct code_node_t *end, u32 depth)
 {
     struct code_node_t *temp = NULL;
     struct variant_node_t * var = NULL;
     u8  temp_cmd[SCRIPT_LINE_MAX_WORD_NUM][SCRIPT_MAX_WORD_SIZE];
+	TT_STATUS ret = TT_PASS;
 
     i32 i = 0, j = 0;
 
@@ -629,26 +629,26 @@ BOOL exec_loop_body(struct script_manager_t* sm, struct code_node_t *start, stru
     {
         if (start->type != CODE_TYPE_LOOP_START)
         {
-            dpu_error("why loop start type error\n");
+            dpu_info(ERROR_LEVEL,"why loop start type error\n");
             while(1);
         }
     
         if (end->type != CODE_TYPE_LOOP_END)
         {
-            dpu_debug("why loop end type error \n");
+            dpu_info(DEBUG_LEVEL,"why loop end type error \n");
             while(1);
         }
     
         var = find_var(sm, start->count_name);
-        //dpu_debug("start %d end %d i %d\n",start->start, start->end, i);
+        //dpu_info(DEBUG_LEVEL,"start %d end %d i %d\n",start->start, start->end, i);
         int_to_ascii(i, var->origin_string[0]);
         for(temp = start; (temp != end) && (temp->node.next != &sm->exec_list);  temp = list_entry(temp->node.next, struct code_node_t, node))
         {
-          //  dpu_debug("i is %d, here  start is %p  end is %p temp is %p\n",i, start, end,  temp);
+          //  dpu_info(DEBUG_LEVEL,"i is %d, here  start is %p  end is %p temp is %p\n",i, start, end,  temp);
 
             if ((start->depth + 1 ==  temp->depth) && (temp->type == CODE_TYPE_LOOP_START))
             {
-                exec_loop_body(sm, temp, find_end(sm, temp), temp->depth);
+                exec_loop_body(dpu_adapter, sm, temp, find_end(sm, temp), temp->depth);
             }
 
             if (start->depth == temp->depth && temp->type == CODE_TYPE_NORMAL)
@@ -658,15 +658,22 @@ BOOL exec_loop_body(struct script_manager_t* sm, struct code_node_t *start, stru
                 {
                     strcpy(temp_cmd[j], temp->code[j]);
                 }
-                do_normal_exec(sm, temp_cmd, temp->word_num, temp->depth, 1);
+                ret = do_normal_exec(dpu_adapter, sm, temp_cmd, temp->word_num, temp->depth, 1);
+				if (ret != TT_PASS)
+				{
+					printf("exec failed here 3 \n");
+					return ret;
+				}
             }
 
             if (start->depth == temp->depth && temp->type == CODE_TYPE_LOOP_END)
             {
-                return TRUE;
+                return TT_PASS;;
             }
         }
     }
+
+	return ret;
 }
 
 void clear_execed_code(struct script_manager_t* sm)
@@ -687,7 +694,7 @@ void clear_execed_code(struct script_manager_t* sm)
     {
         if (var->scope == VAR_SCOPE_LOCAL)
         {
-            //dpu_debug("var name is %s\n",var->name);
+            //dpu_info(DEBUG_LEVEL,"var name is %s\n",var->name);
       
             list_del(&var->node);
             free(var);
@@ -698,9 +705,9 @@ void clear_execed_code(struct script_manager_t* sm)
 }
 
 
-BOOL handle_loop_end(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], u32 word_num, u32 depth)
+TT_STATUS handle_loop_end(struct dpu_adapter_t *dpu_adapter ,struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZE], u32 word_num, u32 depth)
 {
-
+	TT_STATUS ret = TT_PASS;
     struct code_node_t *node = NULL, *start = NULL;
     struct variant_node_t *var = NULL;
     
@@ -719,7 +726,7 @@ BOOL handle_loop_end(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZ
 
     list_for_each_entry(var, struct variant_node_t, &sm->var_list, node)
     {
-       // dpu_debug("var->name is %s scope is %d\n",var->name, var->scope);
+       // dpu_info(DEBUG_LEVEL,"var->name is %s scope is %d\n",var->name, var->scope);
     }
 
     if (depth == 1)
@@ -727,17 +734,20 @@ BOOL handle_loop_end(struct script_manager_t* sm, u8 words[][SCRIPT_MAX_WORD_SIZ
         start = list_entry(sm->exec_list.next,struct code_node_t, node);
 
  
-        print_codes(sm);
+        //print_codes(sm);
 
-        exec_loop_body(sm, start, node, depth);
+        ret = exec_loop_body(dpu_adapter, sm, start, node, depth);
 
         clear_execed_code(sm);
         //print_codes(sm);
     }
 
+	return ret;
+
 }
 
 
+#if 1
 BOOL pre_handle_line(u8 *line_str, u8 words[][SCRIPT_MAX_WORD_SIZE], u32 *word_num)
 {
     u8      filter[] = " ,\t\n";
@@ -771,11 +781,10 @@ BOOL pre_handle_line(u8 *line_str, u8 words[][SCRIPT_MAX_WORD_SIZE], u32 *word_n
     return TRUE;
 }
 
-#if 0
+#endif
 
-void main(int argc, char* argv[])
+void do_script_exec(struct dpu_adapter_t *dpu_adapter)
 {
-
     FILE *fp = NULL;
     u8 *line_str = NULL;
     struct script_manager_t sm = {0};
@@ -786,14 +795,19 @@ void main(int argc, char* argv[])
     u32 exec = 0;
 
 
+	if (!dpu_adapter->script_name)
+	{
+		return ;
+	}
+
     INIT_LIST_HEAD(&sm.exec_list);
     INIT_LIST_HEAD(&sm.var_list);
 
-    fp = fopen(argv[1], "rt");
+    fp = fopen(dpu_adapter->script_name, "rt");
 
     if (!fp)
     {
-        dpu_error("open script failed \n");
+        dpu_info(ERROR_LEVEL,"open script %s failed \n",dpu_adapter->script_name);
         return ;
     }
 
@@ -801,8 +815,8 @@ void main(int argc, char* argv[])
 
     if (!line_str)
     {
-        dpu_error("malloc failed \n");
-        goto end_1;
+        dpu_info(ERROR_LEVEL,"malloc failed \n");
+        goto end;
     }
 
 
@@ -812,12 +826,13 @@ void main(int argc, char* argv[])
         
         fgets(line_str, SCRIPT_LINE_MAX_NUM, fp);
 
-        if (!pre_handle_line(line_str, words, &word_num))
+
+        if (TT_PASS != tt_get_words(line_str, &word_num, words))
         {
             continue;
         }
-
-        if (is_comment(words))
+		
+        if (tt_is_comment(words) || word_num == 0)
         {
             continue;
         }
@@ -825,6 +840,7 @@ void main(int argc, char* argv[])
         if (is_assignment(words))
         {
             do_assignment(&sm, words, word_num);
+			//printf("%s %d\n",line_str, word_num);
             continue;
         }
 
@@ -838,7 +854,12 @@ void main(int argc, char* argv[])
 
         if (is_loop_end(words))
         {
-            handle_loop_end(&sm, words, word_num, depth);
+            ret = handle_loop_end(dpu_adapter, &sm, words, word_num, depth);
+			if (ret != TT_PASS)
+			{
+				printf("exec failed here 2 \n");
+				goto end;
+			}
             depth --;
             
             continue;
@@ -852,22 +873,23 @@ void main(int argc, char* argv[])
         {
             exec = 1;
         }
-        do_normal_exec(&sm, words, word_num, depth, exec);
+        ret = do_normal_exec(dpu_adapter, &sm, words, word_num, depth, exec);
+		if (ret != TT_PASS)
+		{
+			printf("exec failed here \n");
+			goto end;
+		}
     }
 
+end:
 
     clear_execed_code(&sm);
-
-end_1:
-
     if (fp)
     {
         fclose(fp);
         fp = NULL;
     }
 }
-
-#endif
 
 
 

@@ -10,6 +10,7 @@
 
 
 #define VENDER_XX     0x1d17
+//#define VENDER_XX	  	0x15ad
 //#define MAX_CRTC_NUM    3
 //#define MAX_DEVICE_NUM  3
 //#define MAX_PLANE_NUM   2
@@ -32,7 +33,10 @@
 #define SR_B_BASE   0x8700
 #define MMIO_BASE   0
 
-
+#define SCRIPT_ARRAY_MAX_NUM  50
+#define SCRIPT_LINE_MAX_NUM   256
+#define SCRIPT_LINE_MAX_WORD_NUM    50
+#define SCRIPT_MAX_WORD_SIZE   MAX_CMD_OPTION_NAME_SIZE
 
 
 #endif

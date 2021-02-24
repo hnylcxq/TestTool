@@ -4,6 +4,15 @@
 
 struct dpu_adapter_t  *g_dpu_adapter = NULL;
 
+
+
+static u32	g_real_chip = 0;
+static u32  g_de_test = 1;
+u32  g_output_uart = 0;
+u8  g_script_name[SCRIPT_MAX_WORD_SIZE];
+
+
+
 void deinit_adapter()
 {
     if (g_dpu_adapter)
@@ -13,19 +22,46 @@ void deinit_adapter()
     }
 }
 
-struct dpu_adapter_t* init_adapter(int run_on_qt)
+
+struct dpu_adapter_t* create_adapter()
 {
+	u32 test_domain = 0;
+	u32 i = 0;
+
+
 	g_dpu_adapter = (struct dpu_adapter_t*)malloc( sizeof(struct dpu_adapter_t));
 	
 	if(g_dpu_adapter == NULL)
 	{
-		dpu_error("%s failed to alloc mem space for dpu adapter\n",__FUNCTION__);
+		dpu_info(ERROR_LEVEL,"%s failed to alloc mem space for dpu adapter\n",__FUNCTION__);
 		return NULL;
 	}
 	
 	memset(g_dpu_adapter, 0, sizeof(struct dpu_adapter_t));
 	
-	g_dpu_adapter->flags.run_on_qt = run_on_qt ? 1: 0;
+	g_dpu_adapter->flags.run_on_qt = g_real_chip ? 0: 1;
+
+	test_domain = g_de_test ?  TEST_DE : TEST_WITHOUT_DE;
+
+	if (test_domain & TEST_DE)
+	{
+		test_domain |= g_real_chip ? TEST_DE_WITH_REAL_CHIP : 0;
+	}
+
+	g_dpu_adapter->test_domain = test_domain;
+	g_dpu_adapter->log_level = DEBUG_LEVEL;
+
+    g_dpu_adapter->cmd_num = 0;
+
+	if (strlen(g_script_name) != 0)
+	{
+		g_dpu_adapter->script_name = g_script_name;
+	}
+
+    for (i = 0; i < MAX_INPUT_HISTORY_NUM; i++)
+    {
+        memset(g_dpu_adapter->cmd_history[i], '\0', MAX_CMD_STRING_NUM);
+    }
 	
 	return g_dpu_adapter;
 	
@@ -50,7 +86,7 @@ TT_STATUS tt_enable_card(struct base_adapter_t * base_adapter)
         mm850c = tt_read_mmio_byte(base_adapter->mmio_base, 0x850c);
         if (!(mm850c & 0x02))
         {
-            dpu_error("fatal error:  enable card failed !!!\n");
+            dpu_info(ERROR_LEVEL,"fatal error:  enable card failed !!!\n");
             ret = TT_FAIL;
         }
     }
@@ -59,16 +95,15 @@ TT_STATUS tt_enable_card(struct base_adapter_t * base_adapter)
 #endif
 }
 
-TT_STATUS init_card_info()
+TT_STATUS find_adapter()
 {
 	u32 found = 0;
     TT_STATUS ret = TT_PASS;
 	
 	found = tt_get_pci_info(&g_dpu_adapter->base);
-	
+
 	if (!found)
 	{
-		dpu_error("couldn't found video card \n");
         ret = TT_FAIL;
         return ret;
 	}
@@ -79,6 +114,7 @@ TT_STATUS init_card_info()
         tt_enable_mmio_access(&g_dpu_adapter->base);
         ret = tt_enable_card(&g_dpu_adapter->base);
     }
+	
 
     return ret;
 }
@@ -162,10 +198,11 @@ void init_cached_cmd(struct dpu_adapter_t *dpu_adapter)
     device->disable = 0;
 }
 
-void init_card(struct dpu_adapter_t *dpu_adapter)
+//do init adapter hw here
+void init_adapter(struct dpu_adapter_t *dpu_adapter)
 {
 
-    if (dpu_adapter->test_domain & TEST_DOS_ONLY)
+    if (dpu_adapter->test_domain & TEST_WITHOUT_DE)
     {
         return;
     }
@@ -182,95 +219,187 @@ void init_card(struct dpu_adapter_t *dpu_adapter)
 }
 
 
+void parse_config(u8 words[][SCRIPT_MAX_WORD_SIZE], u32 word_num)
+{
+	FILE *fp = NULL;
+
+	if (tt_is_same_str(words[0], "REAL_CHIP"))
+	{
+		g_real_chip = strtoul(words[1], NULL, 10);
+		printf("g_real_chip is %d \n", g_real_chip);
+	}
+	else if (tt_is_same_str(words[0], "DE_TEST"))
+	{
+		g_de_test = strtoul(words[1], NULL, 10);
+		printf("g_de_test is %d\n", g_de_test);
+	}
+	else if (tt_is_same_str(words[0], "UART_OUTPUT"))
+	{
+		g_output_uart = strtoul(words[1], NULL, 10);
+		printf("g_output_uart is %d\n", g_output_uart);
+	}
+	else if (tt_is_same_str(words[0], "SCRIPT_NAME"))
+	{
+		fp = fopen(words[1], "rt");
+		if (!fp)
+		{
+			printf("script %s is not exit \n",words[1]);
+		}
+		else
+		{
+			strcpy(g_script_name, words[1]);
+			printf("g_script_name is %s\n",	g_script_name);
+
+			fclose(fp);
+		}
+	}
+
+
+}
 
 
 extern void process_cmd(struct dpu_adapter_t *dpu_adapter);
 
 
-u32 handle_param(int argc, char** argv)
+static u8* g_config_file = "testtool.cfg";
+
+void load_config(int argc, char** argv)
 {
     u32 ret = 0;
+	FILE *fp = NULL;
+    u8 *line_str = NULL;
+	u32 has_config = 1;
+	u8   words[SCRIPT_LINE_MAX_WORD_NUM][SCRIPT_MAX_WORD_SIZE] = {0};
+    u32    word_num = 0;
 
-
-    if (argc < 2)
-    {
-        ret |= TEST_DOS_ONLY;
-    }
-
-	if (argc >= 2)
+	fp = fopen(g_config_file, "rt");
+	if (!fp)
 	{
-		if (strcmp(argv[1], "de") == 0)
+		printf("open %s failed \n", g_config_file);
+
+		g_real_chip = 0;
+		g_de_test = 1;
+	}
+	else
+	{
+		line_str = malloc(SCRIPT_LINE_MAX_NUM);
+
+		if (!line_str)
 		{
-			ret |= TEST_DE ;
+			printf("malloc failed ????\n");
+			fclose(fp);
+			return;
+		}
+
+		printf("********** %s info start ********\n", g_config_file);
+
+
+	    while (!feof(fp))
+	    {
+	        memset(line_str, '\0', SCRIPT_LINE_MAX_NUM);
+	        
+	        fgets(line_str, SCRIPT_LINE_MAX_NUM, fp);
+
+	        if (TT_PASS != tt_get_words(line_str, &word_num, words))
+	        {
+	            continue;
+	        }
+
+			if (tt_is_comment(words) || word_num < 2)  //use <key,value> do config
+	        {
+	            continue;
+	        }
+			parse_config(words, word_num);
+		}
+		printf("********** %s info end ********\n", g_config_file);
+
+		fclose(fp);
+	}
+
+	//see whether user input script 
+	if ((argc >= 2) && tt_is_end_with(argv[1], ".sh"))
+	{
+		if (strlen(argv[1]) < SCRIPT_MAX_WORD_SIZE)
+		{
+			fp = fopen(argv[1], "rt");
+			if (!fp)
+			{
+				printf("cmdline script %s is not exit \n",argv[1]);
+
+				if (strlen(g_script_name) != 0)
+				{
+					printf("will run script %s\n", g_script_name);
+				}
+			}
+			else
+			{
+				strcpy(g_script_name, argv[1]);
+				printf("will run cmdline script %s\n", g_script_name);
+
+				fclose(fp);
+			}
+		}
+		else
+		{
+			printf("ERROR, script name is too long \n");
 		}
 	}
 
-
-	if (argc >= 3)
-	{
-		if (strcmp(argv[2], "qt") == 0)
-		{
-			ret |= TEST_DE_WITH_QT ;
-		}
-	}
-
-    return ret;
-    
 }
 
-void main(int argc, char** argv)
+int main(int argc, char** argv)
 {
-	u32 run_on_qt = 0 ;
 	struct dpu_adapter_t *p;
 	TT_STATUS ret = TT_PASS;
-    u32 test_domain = 0;
 
+	load_config(argc, argv);
 
-    test_domain = handle_param(argc, argv);
-
-    run_on_qt = test_domain & TEST_DE_WITH_QT;
-
-#ifdef OUTPUT_UART
-	bios_helper_init();
-#endif
-
-	p = init_adapter(run_on_qt);
-	if (!p)
+	ret = init_platform_funcs();
+	if (ret != TT_PASS)
 	{
-		dpu_error("init adapter failed \n");
 		goto end;
 	}
 
-    p->test_domain = test_domain;
+	ret = tt_init_platform();
+	if(ret != TT_PASS)
+	{
+		dpu_info(ERROR_LEVEL,"init platform env failed \n");
+		goto end;
+	}
 
-	ret = init_card_info();
-    if (ret == TT_FAIL)
-    {
-        dpu_error("init card info faild ");
-        //goto end;//we use DOS box to test pure software logic, comment here temperary, restore it after board ready
-    }
+	p = create_adapter();
+	if (!p)
+	{
+		dpu_info(ERROR_LEVEL,"create adapter failed \n");
+		goto end;
+	}
 
-    dpu_info("mmio base is 0x%x   fb base is 0x%x  size 0x%x\n", p->base.mmio_base, p->base.fb_base, p->base.fb_size);
+	ret = find_adapter();
+	if (ret == TT_FAIL)
+	{
+		dpu_info(ERROR_LEVEL,"no supported adapters found\n ");
+		//goto end;//we use DOS box to test pure software logic, comment here temperary, restore it after board ready
+	}
 
-    init_card(p);
+	init_adapter(p);
 
-    init_dm(p);
+	init_dm(p);
 
-    init_surfaces(p);
-    
-    init_cached_cmd(p);
-    
-    init_video_memory(p);
+	init_surfaces(p);
 
-    process_cmd(p);
+	init_cached_cmd(p);
 
+	init_video_memory(p);
 
+	process_cmd(p);
 
-    deinit_dm(p);
+	deinit_dm(p);
 
-    deinit_video_memory();
+	deinit_video_memory();
+
+	tt_deinit_platform(p);
 
 end:
 	deinit_adapter();
-	return;
+	return ret;
 }

@@ -1,0 +1,48 @@
+    case SPL_WIN_VLD:
+        dump_spl_win_vld(tp);
+        break;
+    case SUPS_VWIN_VLD:
+        dump_sups_vwin_vld(tp);
+        break;
+    case SUPS_HWIN_VLD:
+        dump_sups_hwin_vld(tp);
+        break;
+    case SUPS_CONFIG_DONE:
+        dump_sups_config_done(tp);
+        break;
+    case CUR_VLD:
+        dump_cur_vld(tp);
+        break;
+    case CUR_CSC_VLD:
+        dump_cur_csc_vld(tp);
+        break;
+    case SCSC_IN_WIN_VLD:
+        dump_scsc_in_win_vld(tp);
+        break;
+    case SCSC_CONFIG_DONE:
+        dump_scsc_config_done(tp);
+        break;
+    case OVL_IN_DE:
+        dump_ovl_in_de(tp);
+        break;
+    case OVL_CONFIG:
+        dump_ovl_config(tp);
+        break;
+    case PUS_IN_DE:
+        dump_pus_in_de(tp);
+        break;
+    case PUS_CONFIG:
+        dump_pus_config(tp);
+        break;
+    case LUT_IF:
+        dump_lut_if(tp);
+        break;
+    case LUT_CONFIG:
+        dump_lut_config(tp);
+        break;
+    case DIHTER_IN_DE:
+        dump_dihter_in_de(tp);
+        break;
+    case DITHER_CONFIG:
+        dump_dither_config(tp);
+        break;
