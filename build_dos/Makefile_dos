@@ -72,7 +72,19 @@ CC=wcc386
 LINK=link
 WLINK=wlink
 
-CC_OPT=-w0 -ef -j -zq -od -d2 -6r -bt=dos -mf -i=$(DE_PATH) -fo=$(OUTPUTPATH)\$*.obj
+CC_OPT=-w0 -ef -j -zq -od -d2 -6r -bt=dos -mf -fo=$(OUTPUTPATH)\$*.obj \
+	-i=$(DE_PATH) \
+	-i=$(DE_PATH)\audio \
+	-i=$(DE_PATH)\chip\common \
+	-i=$(DE_PATH)\chip\chip_A \
+	-i=$(DE_PATH)\dp \
+	-i=$(DE_PATH)\dvo \
+	-i=$(DE_PATH)\hdmi \
+	-i=$(DE_PATH)\include \
+	-i=$(DE_PATH)\include\register \
+	-i=$(DE_PATH)\modules\ddc \
+	-i=$(DE_PATH)\modules\edid \
+	-i=$(DE_PATH)\modules\mode
 
 LINK_OPT=-nologo -out:$@
 WLINK_OPT=debug all sys dos32a op q
