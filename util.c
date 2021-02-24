@@ -1439,7 +1439,7 @@ TT_STATUS init_platform_funcs()
 
 	platform_funcs = &dos_funcs; 
 	
-#elif defined  __LINUX__
+#elif defined  __DPU_LINUX_KERNEL__
 
 	platform_funcs = &linux_funcs;
 	

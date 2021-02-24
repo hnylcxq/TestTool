@@ -9,13 +9,14 @@
 
 #include"dpu.h"
 
-#include"cmodel_wrapper.h"
+
 
 //#include"dpu_arch/dpu_cmodel.h"
-#ifdef __LINUX__
+#ifdef __DPU_LINUX_KERNEL__
 
 #include <termios.h>
 #include <unistd.h>
+#include"cmodel_wrapper.h"
 
 int getch (void)
 {
@@ -2783,6 +2784,7 @@ static void handle_echo(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
 	dpu_info(INFO_LEVEL, "\n");
 }
 
+
 void get_hw_signature(struct dpu_adapter_t *dpu_adapter, u32 crtc, u64* value)
 {
 	struct hw_signature_t  sig = {0};
@@ -2820,7 +2822,7 @@ TT_STATUS do_signature_compare(struct dpu_adapter_t *dpu_adapter, u32 crtc, u32 
 
 }
 
-
+#ifdef __DPU_LINUX_KERNEL__
 
 void prepare_cmodel_args(struct dpu_adapter_t *dpu_adapter, struct cmodel_args_t *args, struct de_hw_env_t *hw_env)
 {
@@ -3340,6 +3342,17 @@ end:
 	return ret;
 
 }
+#else
+
+static TT_STATUS handle_check_signature(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
+{
+
+	dpu_info(ERROR_LEVEL, "signature check are only supported on linux \n");
+	return TT_FAIL;
+}
+
+
+#endif
 
 
 static TT_STATUS misc_handle(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_OPTION_NAME_SIZE], u32 word_num)
@@ -3502,7 +3515,7 @@ void get_input(struct dpu_adapter_t *dpu_adapter, u8* cmd_line)
         ch = getch();
 		//dpu_info(INFO_LEVEL,"ch is  0x%x	 ",ch);
 
-#ifdef __LINUX__
+#ifdef __DPU_LINUX_KERNEL__
         if(ch == KEY_UP_DOWN_PRE)
         {
         	ch = getch();

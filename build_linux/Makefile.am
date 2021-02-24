@@ -16,7 +16,7 @@ TestTool_CXXFLAGS =   -I ../dpu_arch/code_piece \
 
 
 
-AM_CPPFLAGS += -D__LINUX__
+AM_CPPFLAGS += -D__DPU_LINUX_KERNEL__
 		   
 TestTool_SOURCES= ../dpu_arch/dpu_cmodel.cpp\
 		../dpu_arch/dpu_csc.cpp\

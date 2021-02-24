@@ -400,7 +400,7 @@ AM_CPPFLAGS = -I ../ -I $(DE_DIR) -I $(DE_DIR)/audio/ -I \
 	$(DE_DIR)/dp/ -I $(DE_DIR)/dvo -I $(DE_DIR)/hdmi/ -I \
 	$(DE_DIR)/include -I $(DE_DIR)/include/register -I \
 	$(DE_DIR)/modules/ddc -I $(DE_DIR)/modules/edid -I \
-	$(DE_DIR)/modules/mode -I ../dpu_arch/ -D__LINUX__
+	$(DE_DIR)/modules/mode -I ../dpu_arch/ -D__DPU_LINUX_KERNEL__
 TestTool_CXXFLAGS = -I ../dpu_arch/code_piece \
 		     -I ../dpu_arch/
 

@@ -1,7 +1,7 @@
 
 @echo off
 
-set DE_PATH=..\DE
+set DE_PATH=..\..\DE
 set OUTPUT=%CD%
 
 if /I "%1" EQU "all" (

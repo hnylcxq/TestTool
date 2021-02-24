@@ -44,7 +44,7 @@ typedef enum _MISC_OP_TYPE
 
 
 
-#ifdef __LINUX__
+#ifdef __DPU_LINUX_KERNEL__
 #define   KEY_ENTER   				0x0A
 #define   KEY_UP_DOWN_PRE			27
 

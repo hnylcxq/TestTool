@@ -55,8 +55,7 @@
  /usr/include/strings.h \
  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
  /usr/include/x86_64-linux-gnu/bits/string_fortified.h ../types.h \
- ../config.h ../list.h ../../DE/dpu.h ../util.h \
- ../dpu_arch/cmodel_wrapper.h /usr/include/termios.h \
+ ../config.h ../list.h ../../DE/dpu.h ../util.h /usr/include/termios.h \
  /usr/include/x86_64-linux-gnu/bits/termios.h \
  /usr/include/x86_64-linux-gnu/bits/termios-struct.h \
  /usr/include/x86_64-linux-gnu/bits/termios-c_cc.h \
@@ -74,7 +73,8 @@
  /usr/include/x86_64-linux-gnu/bits/getopt_posix.h \
  /usr/include/x86_64-linux-gnu/bits/getopt_core.h \
  /usr/include/x86_64-linux-gnu/bits/unistd.h \
- /usr/include/x86_64-linux-gnu/bits/unistd_ext.h
+ /usr/include/x86_64-linux-gnu/bits/unistd_ext.h \
+ ../dpu_arch/cmodel_wrapper.h
 
 /usr/include/stdc-predef.h:
 
@@ -212,8 +212,6 @@
 
 ../util.h:
 
-../dpu_arch/cmodel_wrapper.h:
-
 /usr/include/termios.h:
 
 /usr/include/x86_64-linux-gnu/bits/termios.h:
@@ -253,3 +251,5 @@
 /usr/include/x86_64-linux-gnu/bits/unistd.h:
 
 /usr/include/x86_64-linux-gnu/bits/unistd_ext.h:
+
+../dpu_arch/cmodel_wrapper.h:

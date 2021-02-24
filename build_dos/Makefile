@@ -84,7 +84,8 @@ CC_OPT=-w0 -ef -j -zq -od -d2 -6r -bt=dos -mf -fo=$(OUTPUTPATH)\$*.obj \
 	-i=$(DE_PATH)\include\register \
 	-i=$(DE_PATH)\modules\ddc \
 	-i=$(DE_PATH)\modules\edid \
-	-i=$(DE_PATH)\modules\mode
+	-i=$(DE_PATH)\modules\mode \
+	-i=..\
 
 LINK_OPT=-nologo -out:$@
 WLINK_OPT=debug all sys dos32a op q
@@ -108,13 +109,13 @@ CLEAN:
     @if exist "$(OUTPUTPATH)\TestTool.*" (del /q $(OUTPUTPATH)\TestTool.* > nul)
 
 $(OBJ_TEST_TOOL)
-    @$(CC) $(CC_OPT) $*.c
+    @$(CC) $(CC_OPT) ..\$*.c
     @echo $*.c
 
 
 
 $(OBJ_PLATFORM)
-	@$(CC) $(CC_OPT) platform\dos\$*.c
+	@$(CC) $(CC_OPT) ..\platform\dos\$*.c
     @echo $*.c
 
 $(OBJ_DPU)
@@ -158,10 +159,10 @@ $(OBJ_DPU_DVO)
     @echo $*.c
 	
 $(OBJ_REG_INFO)
-	@$(CC) $(CC_OPT) reg\reg_info\$*.c
+	@$(CC) $(CC_OPT) ..\reg\reg_info\$*.c
     @echo $*.c
 
 $(OBJ_REG)
-	@$(CC) $(CC_OPT) reg\$*.c
+	@$(CC) $(CC_OPT) ..\reg\$*.c
     @echo $*.c
 	
