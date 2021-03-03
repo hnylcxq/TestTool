@@ -228,29 +228,11 @@ struct overlay_info_t
 {
     OVERLAY_MODE mode;
 
-    union
+    struct
     {
-        struct 
-        {
-            u8  kp;
-            u8  ks;
-        }window_key;
-
-        struct   //need alpha key value ???
-        {
-            u8  kp;
-            u8  ks;
-        }alpha_key;
-
-        struct 
-        {
-            u8  type;
-            struct 
-            {
-                u8  _10bit_color: 1;  //need check spec
-                u8  reserved :7;
-            };
-        }color_key;
+      
+        u8  kp;
+        u8  ks;
 
         struct 
         {
@@ -279,12 +261,8 @@ struct overlay_info_t
             };
         }alpha_blending;
 
-        struct
-        {
-            u32 lower_bound;
-            u32 upper_bound;
-            
-        }chroma_key;
+        u32 key_low;
+        u32 key_high;  
     };
 };
 
@@ -564,10 +542,12 @@ struct overlay_cmd_t
 {
     u32 mode;
     u32 m_valid;
-    u32 k0;
-    u32 k1;
-    u32 k2;
-    u32 k_valid;
+    u32 kp;
+    u32 ks;
+    u32 kps_valid;
+	u32 key_low;
+	u32 key_high;
+	u32 key_valid;
 };
 
 struct plane_cmd_t

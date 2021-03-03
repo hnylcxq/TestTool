@@ -10,6 +10,16 @@
 #include"dpu.h"
 
 
+#if CMODEL_DEBUG
+
+#define cmodel_debug  	dpu_info
+
+#else
+
+#define cmodel_debug 
+#endif
+
+
 
 //#include"dpu_arch/dpu_cmodel.h"
 #ifdef __DPU_LINUX_KERNEL__
@@ -130,8 +140,9 @@ static struct options_table plane_options_table[] =
     {"dw", "[-dw dst_w dst_h]", 2, {{10, &g_plane_cmd.dst_w}, {10, &g_plane_cmd.dst_h}}},
     {"d", "[-d disable]", 1, {{10, &g_plane_cmd.disable_plane, &g_plane_cmd.dp_valid}}},
     {"km", "[-km keymode] ", 1, {{10, &g_plane_cmd.overlay_cmd.mode, &g_plane_cmd.overlay_cmd.m_valid},}},
-    {"kv", "[-kv k0 k1 k2] k0,k1 k2", 3, {{10, &g_plane_cmd.overlay_cmd.k0, &g_plane_cmd.overlay_cmd.k_valid},
-                                                                            {10, &g_plane_cmd.overlay_cmd.k1},{16, &g_plane_cmd.overlay_cmd.k2}}},
+    {"kp", "[-kp kp ks]  kp ks", 2, {{10, &g_plane_cmd.overlay_cmd.kp, &g_plane_cmd.overlay_cmd.kps_valid},
+                                                                            {10, &g_plane_cmd.overlay_cmd.ks}}},
+    {"kv", "[-kv key_l key_h]", 2,{{16, &g_plane_cmd.overlay_cmd.key_low, &g_plane_cmd.overlay_cmd.key_valid}, {16, &g_plane_cmd.overlay_cmd.key_high}}},
     {"info", "[-info]  current plane info", 0 ,{{0, NULL, &g_plane_cmd.info_cmd},}},
     {"list", "[-list]  list cached plane config",0, {{0, NULL, &g_plane_cmd.list_cmd}}},
     {"help", "[-help] help ", 0, {{0, NULL, &g_plane_cmd.help_cmd},}},
@@ -516,7 +527,7 @@ end:
 
 static void plane_handle_trace(struct plane_cmd_t *plane_cmd)
 {
-    dpu_info(TRACE_LEVEL,"crtc %d, ci_valid %d surface %d surface_valid %d, plane %d, plane_valid %d  info %d list %d help %d \n",
+    dpu_info(INFO_LEVEL,"crtc %d, ci_valid %d surface %d surface_valid %d, plane %d, plane_valid %d  info %d list %d help %d \n",
          plane_cmd->crtc_index,
          plane_cmd->ci_valid,
          plane_cmd->surface_index,
@@ -527,7 +538,7 @@ static void plane_handle_trace(struct plane_cmd_t *plane_cmd)
          plane_cmd->list_cmd,
          plane_cmd->help_cmd);
     
-    dpu_info(TRACE_LEVEL,"src_window (%d,%d,%d,%d) src_valid %d dst_window(%d,%d,%d,%d) dst_valid %d cmd_index %d, cmd_valid %d disable %d, d_v %d\n",
+    dpu_info(INFO_LEVEL,"src_window (%d,%d,%d,%d) src_valid %d dst_window(%d,%d,%d,%d) dst_valid %d cmd_index %d, cmd_valid %d disable %d, d_v %d\n",
          plane_cmd->src_x,
          plane_cmd->src_y,
          plane_cmd->src_w,
@@ -543,13 +554,15 @@ static void plane_handle_trace(struct plane_cmd_t *plane_cmd)
          plane_cmd->disable_plane,
          plane_cmd->dp_valid);
     
-    dpu_info(TRACE_LEVEL,"overlay key mode %d mode_valid %d k0 %d  k1 %d  k2 %d  k_valid 0x%x\n",
+    dpu_info(INFO_LEVEL,"overlay key mode %d mode_valid %d kp %d  ks %d  kps_valid %d key_low 0x%x key_high 0x%x  key_valid %d\n",
          plane_cmd->overlay_cmd.mode,
          plane_cmd->overlay_cmd.m_valid,
-         plane_cmd->overlay_cmd.k0,
-         plane_cmd->overlay_cmd.k1,
-         plane_cmd->overlay_cmd.k2,
-         plane_cmd->overlay_cmd.k_valid);
+         plane_cmd->overlay_cmd.kp,
+         plane_cmd->overlay_cmd.ks,
+         plane_cmd->overlay_cmd.kps_valid,
+         plane_cmd->overlay_cmd.key_low,
+         plane_cmd->overlay_cmd.key_high,
+         plane_cmd->overlay_cmd.key_valid);
 }
 
 static void plane_handle_list(struct dpu_adapter_t *dpu_adapter)
@@ -578,11 +591,12 @@ static void plane_handle_list(struct dpu_adapter_t *dpu_adapter)
                 cached_cmd->dst_w,
                 cached_cmd->dst_h,
                 cached_cmd->disable_plane);
-            dpu_info(INFO_LEVEL,"          overlay: key mode %d k0 %d k1 %d k2 %d \n",
+            dpu_info(INFO_LEVEL,"          overlay: key mode %d kp %d ks %d key_l 0x%x  key_h 0x%x \n",
                 cached_cmd->overlay_cmd.mode,
-                cached_cmd->overlay_cmd.k0,
-                cached_cmd->overlay_cmd.k1,
-                cached_cmd->overlay_cmd.k2);  
+                cached_cmd->overlay_cmd.kp,
+                cached_cmd->overlay_cmd.ks,
+                cached_cmd->overlay_cmd.key_low,
+                cached_cmd->overlay_cmd.key_high);  
         }
     }
 }
@@ -597,18 +611,17 @@ static void plane_handle_help()
 
     //add more help info here
 
-    dpu_info(INFO_LEVEL,"--detail info about [-kv k0 k1 k2]\n");
-    dpu_info(INFO_LEVEL,"  0: Constant_Alpha;                 alpha = k0(0x00~0xFF)\n");
-    dpu_info(INFO_LEVEL,"  1: PS Alpha Blending;              alpha blend type = k0(0: coverage; 1: pre-multiplied), plane value = k1(0x00~0xFF)\n");
-    dpu_info(INFO_LEVEL,"  2: SS/TS Over PS    Color Key;     color key type = k0(0:input A.Color_key Or input B.Color_Key,\n");
-    dpu_info(INFO_LEVEL,"                                                         1:input A.Color_key, 2:input B.Color_Key\n");
-    dpu_info(INFO_LEVEL,"  3: PS    Over SS/TS Color Key;     color key = k0(ex. 0xff0000)\n");
-    dpu_info(INFO_LEVEL,"  4: SS/TS Over PS    Window Key;    kp = k0(0~8), ks = k1(0~8)  NOTE: kp + ks = 8\n");
-    dpu_info(INFO_LEVEL,"  5: SS/TS Over PS    Alpha Key;     kp = k0(0~8), ks = k1(0~8), alpha key = k2(0x00~0xFF)  NOTE: kp + ks = 8\n");
-    dpu_info(INFO_LEVEL,"  6: PS    Over SS/TS Window Key;    kp = k0(0~8), ks = k1(0~8)  NOTE: kp + ks = 8\n");
-    dpu_info(INFO_LEVEL,"  7: PS    Over SS/TS Alpha Key;     kp = k0(0~8), ks = k1(0~8), alpha key = k2(0x00~0xFF)  NOTE: kp + ks = 8\n");
-    dpu_info(INFO_LEVEL,"  8: SS/TS Alpha Blending.           alpha blend type = k0(0: coverage; 1: pre-multiplied), plane value = k1\n\n");
-    dpu_info(INFO_LEVEL,"  9: chroma Key(ps over ss, only support ycbcr422_16);     lower key = k0, upper key = k1\n");
+    dpu_info(INFO_LEVEL,"--detail info about [-kp kp ks] [-kv key_low key_high]\n");
+    dpu_info(INFO_LEVEL,"  0: Constant_Alpha;                 alpha = key_low\n");
+    dpu_info(INFO_LEVEL,"  1: PS Alpha Blending;              alpha blend type = kp(0: coverage; 1: pre-multiplied), plane value = ks(0x00~0xFF)\n");
+    dpu_info(INFO_LEVEL,"  2: SS/TS Over PS    Color Key;     kp, ks , colory_key = key_low\n");
+    dpu_info(INFO_LEVEL,"  3: PS    Over SS/TS Color Key;     kp, ks , colory_key = key_low, need 30bpp color key\n");
+    dpu_info(INFO_LEVEL,"  4: SS/TS Over PS    Window Key;    kp = kp(0~8), ks = ks(0~8)  NOTE: kp + ks = 8\n");
+    dpu_info(INFO_LEVEL,"  5: SS/TS Over PS    Alpha Key;     kp = kp(0~8), ks = ks(0~8), alpha key = key_low(0x00~0xFF)  NOTE: kp + ks = 8\n");
+    dpu_info(INFO_LEVEL,"  6: PS    Over SS/TS Window Key;    kp = kp(0~8), ks = ks(0~8)  NOTE: kp + ks = 8\n");
+    dpu_info(INFO_LEVEL,"  7: PS    Over SS/TS Alpha Key;     kp = kp(0~8), ks = ks(0~8), alpha key = key_low(0x00~0xFF)  NOTE: kp + ks = 8\n");
+    dpu_info(INFO_LEVEL,"  8: SS/TS Alpha Blending.           alpha blend type = kp(0: coverage; 1: pre-multiplied), plane value = ks\n\n");
+    dpu_info(INFO_LEVEL,"  9: chroma Key;     lower key = key_low, key_hight = key_high\n");
 
 }
 
@@ -650,9 +663,9 @@ static void plane_handle_info(struct dpu_adapter_t *dpu_adapter)
                     plane_info->surface->index);
         
 
-            if (plane_info->plane_type != PRIMARY_PLANE)
+            if (1)//plane_info->plane_type != PRIMARY_PLANE)
             {
-                dpu_info(INFO_LEVEL,"            overlay info : mode %s \n", g_key_mode_string[plane_info->overlay_info.mode]);
+                dpu_info(INFO_LEVEL,"            overlay info : mode %s ", g_key_mode_string[plane_info->overlay_info.mode]);
                 switch(plane_info->overlay_info.mode)
                 {
                     case CONSTANT_ALPHA:
@@ -676,42 +689,41 @@ static void plane_handle_info(struct dpu_adapter_t *dpu_adapter)
                         plane_info->overlay_info.alpha_blending.premul_blend ? "premult":"coverage",
                         plane_info->overlay_info.alpha_blending.use_ps_alpha ? "PS" : "SS",
                         plane_info->overlay_info.alpha_blending.invert_alpha);
-                        if (plane_info->overlay_info.alpha_blending.plane_blending)
-                        {
-                            dpu_info(INFO_LEVEL,"            with plane bending: 0x%x\n",
-                            plane_info->overlay_info.alpha_blending.plane_value);
-                        }
-                        else
-                        {
-                            dpu_info(INFO_LEVEL,"            with no plane bneding\n");
-                        }
+
+                        dpu_info(INFO_LEVEL,"            with plane bending: 0x%x\n",
+                        plane_info->overlay_info.alpha_blending.plane_value);
+                  
                         break;
                     case POS_COLOR_KEY:
                     case SOP_COLOR_KEY:
                     //TODO: type ?
-                        dpu_info(INFO_LEVEL,"            type %d, %s color\n",
-                        plane_info->overlay_info.color_key.type,
-                        plane_info->overlay_info.color_key._10bit_color ? "10bit": "8bit");
+                        dpu_info(INFO_LEVEL,"color key 0x%x kp %d ks %d \n",
+							plane_info->overlay_info.key_low, 
+							plane_info->overlay_info.kp,
+							plane_info->overlay_info.ks);
                         break;
                     case SOP_WINDOW_KEY:
                     case POS_WINDOW_KEY:
+						dpu_info(INFO_LEVEL,"window key 0x%x kp %d ks %d \n",
+							plane_info->overlay_info.key_low, 
+							plane_info->overlay_info.kp,
+							plane_info->overlay_info.ks);
 
-                        dpu_info(INFO_LEVEL,"            kp %d, ks %d\n",
-                        plane_info->overlay_info.window_key.kp,
-                        plane_info->overlay_info.window_key.ks);
                         break;
                     case  SOP_ALPHA_KEY:
                     case  POS_ALPHA_KEY:
-
-                        dpu_info(INFO_LEVEL,"            kp %d ks %d\n",
-                        plane_info->overlay_info.alpha_key.kp,
-                        plane_info->overlay_info.alpha_key.ks);
+                        dpu_info(INFO_LEVEL,"alpha key 0x%x kp %d ks %d\n",
+							plane_info->overlay_info.key_low,
+	                        plane_info->overlay_info.kp,
+	                        plane_info->overlay_info.ks);
                         break;
                     case  CHROMA_KEY:
 
-                        dpu_info(INFO_LEVEL,"            lower bound 0x%x, upper bound 0x%x",
-                        plane_info->overlay_info.chroma_key.lower_bound,
-                        plane_info->overlay_info.chroma_key.upper_bound);
+                        dpu_info(INFO_LEVEL,"lower bound 0x%x, upper bound 0x%x, kp %d ks %d\n",
+	                        plane_info->overlay_info.key_low,
+	                        plane_info->overlay_info.key_high,					
+	                        plane_info->overlay_info.kp,
+	                        plane_info->overlay_info.ks);
                         break;
                     default:
 
@@ -782,7 +794,6 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
     prepare_cmd.dst_h = 480;
 
     prepare_cmd.disable_plane = 0;
-    prepare_cmd.overlay_cmd.k_valid = 0;
     prepare_cmd.overlay_cmd.m_valid = 0;
 
     new_cmd = 1;
@@ -881,13 +892,21 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
     }
 
     
-    if (plane_cmd->overlay_cmd.k_valid)
+    if (plane_cmd->overlay_cmd.kps_valid)
     {
-        prepare_cmd.overlay_cmd.k0 = plane_cmd->overlay_cmd.k0;
-        prepare_cmd.overlay_cmd.k1 = plane_cmd->overlay_cmd.k1;
-        prepare_cmd.overlay_cmd.k2 = plane_cmd->overlay_cmd.k2;
-        prepare_cmd.overlay_cmd.k_valid = 1;
+        prepare_cmd.overlay_cmd.kp = plane_cmd->overlay_cmd.kp;
+        prepare_cmd.overlay_cmd.ks = plane_cmd->overlay_cmd.ks;
+        prepare_cmd.overlay_cmd.kps_valid = 1;
     }
+
+	if (plane_cmd->overlay_cmd.key_valid)
+    {
+        prepare_cmd.overlay_cmd.key_high = plane_cmd->overlay_cmd.key_high;
+        prepare_cmd.overlay_cmd.key_low = plane_cmd->overlay_cmd.key_low;
+        prepare_cmd.overlay_cmd.key_valid = 1;
+    }
+
+	printf("lei key_high is 0x%x  low 0x%x\n", prepare_cmd.overlay_cmd.key_high,prepare_cmd.overlay_cmd.key_low);
 
     //check is new cmd or not
     for (i = 0 ;i < MAX_CACHED_CMD_NUM; i++)
@@ -983,176 +1002,149 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
         plane_set.base.dst_w = prepare_cmd.dst_w;
         plane_set.base.dst_h = prepare_cmd.dst_h;
 
-        if(plane_cmd->plane_type != DPU_PRIMARY_PLANE)
+        if(0)//plane_cmd->plane_type == DPU_PRIMARY_PLANE)
         {
         	plane_set.base.overlay.mode = DPU_SOP_WINDOW_KEY;
             plane_set.base.overlay.kp = 0;
             plane_set.base.overlay.ks = 8;
         }
 
+		//update && get overlay info 
+		if (prepare_cmd.overlay_cmd.m_valid)
+		{
+		  	switch(prepare_cmd.overlay_cmd.mode)
+		  	{
+			  	case CONSTANT_ALPHA:
+					plane_info->overlay_info.constant_alpha_blending.constant_alpha = prepare_cmd.overlay_cmd.key_low;
+					plane_info->overlay_info.mode = CONSTANT_ALPHA;
+					plane_set.base.overlay.constant_alpha = prepare_cmd.overlay_cmd.key_low;
+					plane_set.base.overlay.mode = DPU_CONSTANT_ALPHA;
+				  	break;
+			  case PS_ALPHA_BLENDING:
+					plane_info->overlay_info.alpha_blending.premul_blend = prepare_cmd.overlay_cmd.kp ? 1: 0;
+					plane_info->overlay_info.mode = PS_ALPHA_BLENDING;
+					plane_info->overlay_info.alpha_blending.plane_value = prepare_cmd.overlay_cmd.ks;
+					plane_set.base.overlay.premul_blend = prepare_cmd.overlay_cmd.kp ? 1: 0;
+					plane_set.base.overlay.mode = DPU_PS_ALPHA_BLENDING;
+					plane_set.base.overlay.plane_alpha  = prepare_cmd.overlay_cmd.ks & 0xff;
+					break;
+			  case SOP_COLOR_KEY:
+					plane_info->overlay_info.mode = SOP_COLOR_KEY;
+					plane_info->overlay_info.key_low = prepare_cmd.overlay_cmd.key_low;
+					plane_info->overlay_info.key_high = prepare_cmd.overlay_cmd.key_high;
+					plane_info->overlay_info.kp = prepare_cmd.overlay_cmd.kp;
+					plane_info->overlay_info.ks = prepare_cmd.overlay_cmd.ks;
+					plane_set.base.overlay.mode = DPU_SOP_COLOR_KEY;
+					plane_set.base.overlay.low_key = prepare_cmd.overlay_cmd.key_low;
+					plane_set.base.overlay.high_key = prepare_cmd.overlay_cmd.key_high;
+					plane_set.base.overlay.kp  = prepare_cmd.overlay_cmd.kp;
+					plane_set.base.overlay.ks  = prepare_cmd.overlay_cmd.ks;		
+					break;
+			  case POS_COLOR_KEY:
+					plane_info->overlay_info.mode = POS_COLOR_KEY;
+					plane_info->overlay_info.key_low = prepare_cmd.overlay_cmd.key_low;
+					plane_info->overlay_info.key_high = prepare_cmd.overlay_cmd.key_high;
+					plane_info->overlay_info.kp = prepare_cmd.overlay_cmd.kp;
+					plane_info->overlay_info.ks = prepare_cmd.overlay_cmd.ks;
+					plane_set.base.overlay.mode = DPU_POS_COLOR_KEY;
+					plane_set.base.overlay.kp  = prepare_cmd.overlay_cmd.kp;
+					plane_set.base.overlay.ks  = prepare_cmd.overlay_cmd.ks;
+					plane_set.base.overlay.low_key = prepare_cmd.overlay_cmd.key_low;
+					plane_set.base.overlay.high_key = prepare_cmd.overlay_cmd.key_high;
+
+					break;
+			  case SOP_WINDOW_KEY:
+					plane_info->overlay_info.mode = SOP_WINDOW_KEY;
+					plane_info->overlay_info.kp = prepare_cmd.overlay_cmd.kp;
+					plane_info->overlay_info.ks = prepare_cmd.overlay_cmd.ks;
+					plane_info->overlay_info.key_low = prepare_cmd.overlay_cmd.key_low;
+					plane_info->overlay_info.key_high = prepare_cmd.overlay_cmd.key_high;
+
+					printf("prepare kp %d ks %d key low 0x%x key_h 0x%x\n", prepare_cmd.overlay_cmd.kp,prepare_cmd.overlay_cmd.ks,prepare_cmd.overlay_cmd.key_low,prepare_cmd.overlay_cmd.key_high);
+					printf("planei  kp %d ks %d key low 0x%x key_h 0x%x\n",plane_info->overlay_info.kp,plane_info->overlay_info.ks,plane_info->overlay_info.key_low,
+						plane_info->overlay_info.key_high);
+
+
+					plane_set.base.overlay.mode = DPU_SOP_WINDOW_KEY;
+					plane_set.base.overlay.kp = prepare_cmd.overlay_cmd.kp;
+					plane_set.base.overlay.ks = prepare_cmd.overlay_cmd.ks;
+					plane_set.base.overlay.low_key = prepare_cmd.overlay_cmd.key_low;
+					plane_set.base.overlay.high_key = prepare_cmd.overlay_cmd.key_high;
+					break;
+			  case SOP_ALPHA_KEY:
+					plane_info->overlay_info.mode = SOP_WINDOW_KEY;
+					plane_info->overlay_info.kp = prepare_cmd.overlay_cmd.kp;
+					plane_info->overlay_info.ks = prepare_cmd.overlay_cmd.ks;
+					plane_info->overlay_info.key_low = prepare_cmd.overlay_cmd.key_low;
+					plane_info->overlay_info.key_high = prepare_cmd.overlay_cmd.key_high;
+					plane_set.base.overlay.mode = DPU_SOP_WINDOW_KEY;
+					plane_set.base.overlay.kp = prepare_cmd.overlay_cmd.kp;
+					plane_set.base.overlay.ks = prepare_cmd.overlay_cmd.ks;
+					plane_set.base.overlay.low_key = prepare_cmd.overlay_cmd.key_low;
+					plane_set.base.overlay.high_key  = prepare_cmd.overlay_cmd.key_high;
+					break;
+			  case POS_WINDOW_KEY:
+					plane_info->overlay_info.mode = POS_WINDOW_KEY;
+					plane_info->overlay_info.kp = prepare_cmd.overlay_cmd.kp;
+					plane_info->overlay_info.ks = prepare_cmd.overlay_cmd.ks;
+					plane_info->overlay_info.key_low = prepare_cmd.overlay_cmd.key_low;
+					plane_info->overlay_info.key_high = prepare_cmd.overlay_cmd.key_high;
+					plane_set.base.overlay.mode = DPU_POS_WINDOW_KEY;
+					plane_set.base.overlay.kp = prepare_cmd.overlay_cmd.kp;
+					plane_set.base.overlay.ks = prepare_cmd.overlay_cmd.ks;
+					plane_set.base.overlay.low_key = prepare_cmd.overlay_cmd.key_low;
+					plane_set.base.overlay.high_key = prepare_cmd.overlay_cmd.key_high;
+					break;
+			  case POS_ALPHA_KEY:
+					plane_info->overlay_info.mode = POS_ALPHA_KEY;
+					plane_info->overlay_info.kp = prepare_cmd.overlay_cmd.kp;
+					plane_info->overlay_info.ks = prepare_cmd.overlay_cmd.ks;
+					plane_info->overlay_info.key_low = prepare_cmd.overlay_cmd.key_low;
+					plane_info->overlay_info.key_high = prepare_cmd.overlay_cmd.key_high;
+					plane_set.base.overlay.mode = DPU_POS_ALPHA_KEY;
+					plane_set.base.overlay.kp = prepare_cmd.overlay_cmd.kp;
+					plane_set.base.overlay.ks = prepare_cmd.overlay_cmd.ks;
+					plane_set.base.overlay.low_key = prepare_cmd.overlay_cmd.key_low;
+					plane_set.base.overlay.high_key = prepare_cmd.overlay_cmd.key_high;
+
+					break;
+			  case SS_ALPHA_BLENDING:
+					plane_info->overlay_info.alpha_blending.premul_blend = prepare_cmd.overlay_cmd.kp ? 1: 0;
+					plane_info->overlay_info.mode = SS_ALPHA_BLENDING;
+					plane_info->overlay_info.alpha_blending.plane_value = prepare_cmd.overlay_cmd.ks & 0xff;
+					plane_set.base.overlay.premul_blend = prepare_cmd.overlay_cmd.kp ? 1: 0;
+					plane_set.base.overlay.mode = DPU_SS_ALPHA_BLENDING;
+					plane_set.base.overlay.plane_alpha = prepare_cmd.overlay_cmd.ks & 0xff;
+
+					break;
+			  case CHROMA_KEY:
+					plane_info->overlay_info.key_low = prepare_cmd.overlay_cmd.key_low;
+					plane_info->overlay_info.key_high = prepare_cmd.overlay_cmd.key_high;
+					plane_info->overlay_info.kp = prepare_cmd.overlay_cmd.kp;
+					plane_info->overlay_info.ks = prepare_cmd.overlay_cmd.ks;
+					plane_info->overlay_info.mode = CHROMA_KEY;
+					plane_set.base.overlay.mode = DPU_CHROMA_KEY;
+					plane_set.base.overlay.high_key  = prepare_cmd.overlay_cmd.key_low;
+					plane_set.base.overlay.low_key= prepare_cmd.overlay_cmd.key_high;
+					plane_set.base.overlay.kp = prepare_cmd.overlay_cmd.kp;
+					plane_set.base.overlay.ks = prepare_cmd.overlay_cmd.ks;
+
+					break;
+			  default:
+				  	dpu_info(INFO_LEVEL,"shouldn't be here , invalid overlay key mode !!!\n");
+				  	break;
+		  	}
+
+		}
+
         plane_info->plane_state = prepare_cmd.disable_plane;
 
         ret =  (dpu_plane_update(dpu_adapter->dpu_manager, &plane_set) == DPU_OK) ? TT_PASS : TT_FAIL;
     }
 
-#if 0
-        //get page flip info
-        plane_set.crtc = prepare_cmd.crtc_index;
-        plane_set.plane = prepare_cmd.plane_type;
-        plane_set.src_x = prepare_cmd.src_x;
-        plane_set.src_y = prepare_cmd.src_y;
-        plane_set.src_w = prepare_cmd.src_w;
-        plane_set.src_h = prepare_cmd.src_h;
-        plane_set.dst_x = prepare_cmd.dst_x;
-        plane_set.dst_y = prepare_cmd.dst_y;
-        plane_set.dst_w = prepare_cmd.dst_w;
-        plane_set.dst_h = prepare_cmd.dst_h;
-
-     
-        plane_set.surface.addr = surface->gpu_addr;
-        plane_set.surface.bit_cnt = surface->bit_cnt;
-        plane_set.surface.pitch = surface->pitch;
-        plane_set.surface.width = surface->width;
-        plane_set.surface.height = surface->height;
-        plane_set.surface.aligned_width = surface->aligned_width;
-        plane_set.surface.size = surface->size;
-        plane_set.surface.range_type = surface->range_type;
-        plane_set.surface.format = surface->format;  //the define of format is same 
-        plane_set.surface.compressed = surface->compressed;
-
-
-        if (plane_info->plane_state == PLANE_ENABLED)
-        {
-            if (prepare_cmd.disable_plane)
-            {
-                plane_set.flag = DPU_DISABLE_FLIP;
-            }
-            else
-            {
-                plane_set.flag = DPU_PAGE_FLIP_ONLY;
-            }
-        }
-        else
-        {
-            if (prepare_cmd.disable_plane)
-            {
-                plane_set.flag = DPU_DISABLE_FLIP;
-            }
-            else
-            {
-                plane_set.flag = DPU_ENABLE_FLIP;
-            }
-        }
-        //update plane state here
-        plane_info->plane_state = prepare_cmd.disable_plane;
-
-        //update && get overlay info 
-        if (prepare_cmd.overlay_cmd.m_valid)
-        {
-            switch(prepare_cmd.overlay_cmd.mode)
-            {
-                case CONSTANT_ALPHA:
-                    plane_info->overlay_info.constant_alpha_blending.constant_alpha = prepare_cmd.overlay_cmd.k0;
-                    plane_info->overlay_info.mode = CONSTANT_ALPHA;
-                    plane_set.overlay.constant_alpha_blending.constant_alpha = prepare_cmd.overlay_cmd.k0;
-                    plane_set.overlay.mode = DPU_CONSTANT_ALPHA;
-                    break;
-                case PS_ALPHA_BLENDING:
-                    plane_info->overlay_info.alpha_blending.premul_blend = prepare_cmd.overlay_cmd.k0 ? 1: 0;
-                    plane_info->overlay_info.mode = PS_ALPHA_BLENDING;
-                    plane_info->overlay_info.alpha_blending.plane_value = prepare_cmd.overlay_cmd.k1 &0xff;
-                    plane_set.overlay.alpha_blending.premul_blend = prepare_cmd.overlay_cmd.k0 ? 1: 0;
-                    plane_set.overlay.mode = DPU_PS_ALPHA_BLENDING;
-                    plane_set.overlay.alpha_blending.plane_value = prepare_cmd.overlay_cmd.k1 &0xff;
-                    break;
-                case SOP_COLOR_KEY:
-                    plane_info->overlay_info.mode = SOP_COLOR_KEY;
-                    plane_info->overlay_info.color_key.type = prepare_cmd.overlay_cmd.k0;
-                    plane_info->overlay_info.color_key._10bit_color = prepare_cmd.overlay_cmd.k1 ? 1:0;
-                    plane_set.overlay.mode = DPU_SOP_COLOR_KEY;
-                    plane_set.overlay.color_key.type = prepare_cmd.overlay_cmd.k0;
-                    plane_set.overlay.color_key._10bit_color = prepare_cmd.overlay_cmd.k1 ? 1: 0;
-                    break;
-                case POS_COLOR_KEY:
-                    plane_info->overlay_info.mode = POS_COLOR_KEY;
-                    plane_info->overlay_info.color_key.type = prepare_cmd.overlay_cmd.k0;
-                    plane_info->overlay_info.color_key._10bit_color = prepare_cmd.overlay_cmd.k1 ? 1:0;
-                    plane_set.overlay.mode = DPU_POS_COLOR_KEY;
-                    plane_set.overlay.color_key.type = prepare_cmd.overlay_cmd.k0;
-                    plane_set.overlay.color_key._10bit_color = prepare_cmd.overlay_cmd.k1 ? 1: 0;
-                    break;
-                case SOP_WINDOW_KEY:
-                    plane_info->overlay_info.mode = SOP_WINDOW_KEY;
-                    plane_info->overlay_info.window_key.kp = prepare_cmd.overlay_cmd.k0;
-                    plane_info->overlay_info.window_key.ks = prepare_cmd.overlay_cmd.k1;
-                    plane_set.overlay.mode = DPU_SOP_WINDOW_KEY;
-                    plane_set.overlay.window_key.kp = prepare_cmd.overlay_cmd.k0;
-                    plane_set.overlay.window_key.ks = prepare_cmd.overlay_cmd.k1;
-                    break;
-                case SOP_ALPHA_KEY:
-                    plane_info->overlay_info.mode = SOP_WINDOW_KEY;
-                    plane_info->overlay_info.alpha_key.kp = prepare_cmd.overlay_cmd.k0;
-                    plane_info->overlay_info.alpha_key.ks = prepare_cmd.overlay_cmd.k1;
-                    plane_set.overlay.mode = DPU_SOP_WINDOW_KEY;
-                    plane_set.overlay.alpha_key.kp = prepare_cmd.overlay_cmd.k0;
-                    plane_set.overlay.alpha_key.ks = prepare_cmd.overlay_cmd.k1;
-                    break;
-                case POS_WINDOW_KEY:
-                    plane_info->overlay_info.mode = POS_WINDOW_KEY;
-                    plane_info->overlay_info.window_key.kp = prepare_cmd.overlay_cmd.k0;
-                    plane_info->overlay_info.window_key.ks = prepare_cmd.overlay_cmd.k1;
-                    plane_set.overlay.mode = DPU_POS_WINDOW_KEY;
-                    plane_set.overlay.window_key.kp = prepare_cmd.overlay_cmd.k0;
-                    plane_set.overlay.window_key.ks = prepare_cmd.overlay_cmd.k1;
-                    break;
-                case POS_ALPHA_KEY:
-                    plane_info->overlay_info.mode = POS_ALPHA_KEY;
-                    plane_info->overlay_info.alpha_key.kp = prepare_cmd.overlay_cmd.k0;
-                    plane_info->overlay_info.alpha_key.ks = prepare_cmd.overlay_cmd.k1;
-                    plane_set.overlay.mode = DPU_POS_ALPHA_KEY;
-                    plane_set.overlay.alpha_key.kp = prepare_cmd.overlay_cmd.k0;
-                    plane_set.overlay.alpha_key.ks = prepare_cmd.overlay_cmd.k1;
-                    
-                    break;
-                case SS_ALPHA_BLENDING:
-                    plane_info->overlay_info.alpha_blending.premul_blend = prepare_cmd.overlay_cmd.k0 ? 1: 0;
-                    plane_info->overlay_info.mode = SS_ALPHA_BLENDING;
-                    plane_info->overlay_info.alpha_blending.plane_value = prepare_cmd.overlay_cmd.k1 &0xff;
-                    plane_set.overlay.alpha_blending.premul_blend = prepare_cmd.overlay_cmd.k0 ? 1: 0;
-                    plane_set.overlay.mode = DPU_SS_ALPHA_BLENDING;
-                    plane_set.overlay.alpha_blending.plane_value = prepare_cmd.overlay_cmd.k1 &0xff;
-                    
-                    break;
-                case CHROMA_KEY:
-                    plane_info->overlay_info.chroma_key.lower_bound = prepare_cmd.overlay_cmd.k0;
-                    plane_info->overlay_info.chroma_key.upper_bound = prepare_cmd.overlay_cmd.k1;
-                    plane_info->overlay_info.mode = CHROMA_KEY;
-                    plane_set.overlay.mode = DPU_CHROMA_KEY;
-                    plane_set.overlay.chroma_key.lower_bound = prepare_cmd.overlay_cmd.k0;
-                    plane_set.overlay.chroma_key.upper_bound = prepare_cmd.overlay_cmd.k1;
-                    
-                    break;
-                default:
-                    dpu_info(INFO_LEVEL,"shouldn't be here , invalid overlay key mode !!!\n");
-                    
-                    break;
-            }
-        
-        }
-
-
-        if (DPU_OK != dpu_update_plane(dpu_adapter->dpu_manager, &plane_set))
-        {
-            dpu_info(ERROR_LEVEL,"update plane failed ,please help check \n");
-            ret = TT_FAIL;
-            goto end;
-        }
-
-
-    }
 
     ret = TT_PASS;
-#endif
+
 end:
     return ret;
 }
@@ -2661,15 +2653,17 @@ static void handle_file(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
     file_name = buffer[1];
     offset = strtoul(buffer[2], NULL, 16);
 
-    fp = fopen(file_name, "wb+");
-    if (!fp)
-    {
-        dpu_info(INFO_LEVEL,"open file %s failed \n",file_name);
-        return;
-    }     
+       
 
     if (op == OP_READ)
     {
+      	fp = fopen(file_name, "wb+");
+		
+	    if (!fp)
+	    {
+	        dpu_info(INFO_LEVEL,"open file %s failed \n",file_name);
+	        return;
+	    }
         size = strtoul(buffer[3], NULL, 16);
         fwrite((void*)((u8*)dpu_adapter->base.fb_base + offset), size, 1, fp);
         
@@ -2678,11 +2672,20 @@ static void handle_file(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
     }
     else
     {
+    	fp = fopen(file_name, "rb");
+		
+	    if (!fp)
+	    {
+	        dpu_info(INFO_LEVEL,"open file %s failed \n",file_name);
+	        return;
+	    }
         fseek(fp, 0, SEEK_END);
         file_size = ftell(fp);
 
+		dpu_info(INFO_LEVEL, "load file size is %d\n", file_size);
+
         fseek(fp, 0, SEEK_SET);
-        fread((void*)((u8*)dpu_adapter->base.fb_base + offset),file_size, 1, fp);
+        fread((void*)((u8*)dpu_adapter->base.fb_base + offset), file_size, 1, fp);
         
         dpu_info(INFO_LEVEL,"load file to offset 0x%x done \n",offset);
         fclose(fp);
@@ -2824,9 +2827,14 @@ TT_STATUS do_signature_compare(struct dpu_adapter_t *dpu_adapter, u32 crtc, u32 
 
 #ifdef __DPU_LINUX_KERNEL__
 
+
+static void load_data(u8* file_name, void * dst, u32_t bpp, u32_t width, u32_t height);
+
 void prepare_cmodel_args(struct dpu_adapter_t *dpu_adapter, struct cmodel_args_t *args, struct de_hw_env_t *hw_env)
 {
 	u32 size = 0;
+
+	u32 i = 0;
 
 	memset(args, 0, sizeof(struct cmodel_args_t));
 
@@ -2843,18 +2851,37 @@ void prepare_cmodel_args(struct dpu_adapter_t *dpu_adapter, struct cmodel_args_t
 
 	size = dpu_adapter->current_crtc_info[args->crtc].adjust_mode.hactive * 
 			dpu_adapter->current_crtc_info[args->crtc].adjust_mode.vactive * sizeof(struct bus_1010108);
+
+	//backgroud used for overlay ,must destination size
 	args->background =  tt_malloc_mem(size);
 
-	if (hw_env->spl[0].spl_en)
+	dpu_info(INFO_LEVEL, "in prepare_cmodel_args \n");
+	
+	for (i = 0; i < 2; i++)
 	{
-		args->spl_input_src[0] = (u8*)(dpu_adapter->base.fb_base + hw_env->spl[0].gpu_addr);
-		size = args->plane_info[0]->src_w * args->plane_info[0]->src_h * sizeof(struct bus_1010108); 
-		args->spl_input_dst[0] =  tt_malloc_mem(size); //need check input module	s
-		size = args->plane_info[0]->dst_w * args->plane_info[0]->dst_h * sizeof(struct bus_1010108);
-		args->spl_scl_dst[0] = tt_malloc_mem(size);
-		args->spl_csc_dst[0] = tt_malloc_mem(size);
-	}
+		if (hw_env->spl[i].spl_en)
+		{
 
+			size = args->plane_info[i]->src_w * args->plane_info[i]->src_h * 4;
+			#if __KX6000__ 
+			args->spl_input_src[i] = (u8*)(dpu_adapter->base.fb_base) + hw_env->spl[i].base_addr + hw_env->spl[i].base_off;
+			#else
+			args->spl_input_src[i] = tt_malloc_mem(size);
+
+			load_data("dump_0000.bin", args->spl_input_src[i], 4, args->plane_info[i]->src_w,args->plane_info[i]->src_h);
+
+			#endif
+			
+			size = args->plane_info[i]->src_w * args->plane_info[i]->src_h * sizeof(struct bus_1010108);
+			dpu_info(INFO_LEVEL,"spl input dst size %d\n",size);
+			args->spl_input_dst[i] =  tt_malloc_mem(size); //need check input module	s
+			size = args->plane_info[i]->dst_w * args->plane_info[i]->dst_h * sizeof(struct bus_1010108);
+			dpu_info(INFO_LEVEL,"scl dst size %d\n",size);
+			args->spl_scl_dst[i] = tt_malloc_mem(size);
+			args->spl_csc_dst[i] = tt_malloc_mem(size);
+		}
+	}
+	#if 0
 	if (hw_env->spl[1].spl_en)
 	{
 		args->spl_input_src[1] = (u8*)(dpu_adapter->base.fb_base + hw_env->spl[1].gpu_addr);
@@ -2864,7 +2891,7 @@ void prepare_cmodel_args(struct dpu_adapter_t *dpu_adapter, struct cmodel_args_t
 		args->spl_scl_dst[1] = tt_malloc_mem(size);
 		args->spl_csc_dst[1] = tt_malloc_mem(size);
 	}
-
+	#endif
 
 	if(hw_env->cur.cur_en)
 	{
@@ -2927,7 +2954,6 @@ void prepare_input_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env,
 	para->width = args->plane_info[pipe]->src_w;
 	para->height = args->plane_info[pipe]->src_h;
 
-
 }
 
 
@@ -2960,16 +2986,32 @@ void prepare_scl_stream_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw
 	para->dst_w = hw_env->spl[pipe].dst_w;
 	para->dst_h = hw_env->spl[pipe].dst_h;
 
-
     para->is_cos_h = hw_env->spl[pipe].is_cos_h;
     para->is_cos_v = hw_env->spl[pipe].is_cos_v;
     para->is_alpha_ups = hw_env->spl[pipe].is_alpha_ups;
     para->is_v_duplicate = hw_env->spl[pipe].is_v_duplicate;
-    para->keyl = hw_env->spl[pipe].keyl;
+    para->keyl =  hw_env->spl[pipe].keyl;
     para->keyh = hw_env->spl[pipe].keyh;
     para->key_mode = (pipe == 0) ? hw_env->ovl.ovl0_key_mode : hw_env->ovl.ovl1_key_mode;
     para->h_acc = hw_env->spl[pipe].hacc;
     para->v_acc = hw_env->spl[pipe].vacc;
+
+
+	cmodel_debug(INFO_LEVEL,"cmodel_dump:sw(%d,%d) dw(%d,%d),cos_h %d cos_v %d alpha_up %d v_dup %d key1 0x%x keyh 0x%x, key_mode %d, h_acc 0x%x v_acc 0x%x\n",
+		para->src_w,
+		para->src_h,
+		para->dst_w,
+		para->dst_h,
+		para->is_cos_h,
+		para->is_cos_v,
+		para->is_alpha_ups,
+		para->is_v_duplicate,
+		para->keyl,
+		para->keyh,
+		para->key_mode,
+		para->h_acc,
+		para->v_acc);
+
 
 	para->src = (unsigned short*)args->spl_input_dst[pipe];
 	para->dst = (unsigned short*)args->spl_scl_dst[pipe];
@@ -3105,6 +3147,8 @@ void prepare_overlay_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_en
 
 	para->iwin_start_x = hw_env->iwin.start_x;
 	para->iwin_start_y = hw_env->iwin.start_y;
+	para->iwin_width = hw_env->iwin.width;
+	para->iwin_height = hw_env->iwin.height;
 
 	para->dst_width = args->dest_win_w;
 	para->dst_height = args->dest_win_h;
@@ -3221,6 +3265,75 @@ void prepare_signature_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_
 }
 
 
+static u32_t file_name_count = 0;
+static void dump_data(u8* file_name, void * src, u32_t bpp, u32_t width, u32_t height)
+{
+	FILE * fp = NULL;
+	u32 file_size = 0;
+	u32 size = 0;
+
+
+    fp = fopen(file_name, "wb+");
+    if (!fp)
+    {
+        dpu_info(INFO_LEVEL,"open file %s failed ,dump data failed\n",file_name);
+        return;
+    }     
+
+	
+    size = bpp * width * height;
+
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: dump file: %s %p  w %d  h %d  bpp %d\n", file_name, src, width, height, bpp);
+	
+    file_size = fwrite((void*)src, size, 1, fp);
+
+	if (file_size != 1)
+	{
+		cmodel_debug(INFO_LEVEL,"cmodel_dump: error expect write %d size, actually write %d  !!!\n",size ,file_size);
+	}
+    
+    //dpu_info(INFO_LEVEL,"save to file done\n");
+    fclose(fp);
+
+  
+
+}
+
+
+static void load_data(u8* file_name, void * dst, u32_t bpp, u32_t width, u32_t height)
+{
+	FILE * fp = NULL;
+	u32 file_size = 0;
+	u32 size = 0;
+
+
+    fp = fopen(file_name, "rb");
+    if (!fp)
+    {
+        dpu_info(INFO_LEVEL,"open file %s failed ,load data failed\n", file_name);
+        return;
+    }     
+
+	
+    size = bpp * width * height;
+
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: load file: %s %p  w %d  h %d  bpp %d\n", file_name, dst, width, height, bpp);
+	
+    file_size = fread((void*)dst, size, 1, fp);
+
+	if (file_size != 1)
+	{
+		cmodel_debug(INFO_LEVEL,"cmodel_dump: error expect load %d size, actually load %d  !!!\n",size ,file_size);
+	}
+    
+    //dpu_info(INFO_LEVEL,"save to file done\n");
+    fclose(fp);
+
+  
+
+}
+
+
 TT_STATUS do_dpu_process(struct dpu_adapter_t *dpu_adapter, u32 crtc, u64* sw_sig)
 {
 	TT_STATUS ret = TT_PASS;
@@ -3249,11 +3362,22 @@ TT_STATUS do_dpu_process(struct dpu_adapter_t *dpu_adapter, u32 crtc, u64* sw_si
 	if (hw_env.spl[0].spl_en)
 	{
 		prepare_input_args(&args, &hw_env, &input_para, 0);
+
+		dump_data("spl0_input_src.bin", input_para.src, 4, input_para.width, input_para.height);
 		input_wrapper(&input_para); 
+		dump_data("spl0_input_dst.bin", input_para.dst, 8, input_para.width, input_para.height);
+
+		
 		prepare_scl_stream_args(&args, &hw_env, &scl_stream_para, 0);
 		scl_stream_wrapper(&scl_stream_para);
+
+		dump_data("spl0_scl_dst.bin", scl_stream_para.dst, 8, scl_stream_para.dst_w, scl_stream_para.dst_h);
+
+		
 		prepare_csc_plane_args(&args, &hw_env, &csc_plane_para, 0);
 	    csc_plane_wrapper(&csc_plane_para);
+
+		dump_data("spl0_csc_dst.bin", csc_plane_para.dst, 8, csc_plane_para.width, csc_plane_para.height);
 	}
 
 	if (hw_env.spl[1].spl_en)
@@ -3298,7 +3422,7 @@ TT_STATUS do_dpu_process(struct dpu_adapter_t *dpu_adapter, u32 crtc, u64* sw_si
 	prepare_signature_args(&args, &hw_env, &signature_para);
 	*sw_sig = signature_wrapper(&signature_para);
 
-	dpu_info(INFO_LEVEL,"get cmodel signature %lld\n", *sw_sig);
+	dpu_info(INFO_LEVEL,"get cmodel signature 0x%x\n", *sw_sig);
 
 
 	release_cmodel_res(&args);

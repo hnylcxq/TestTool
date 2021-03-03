@@ -51,6 +51,10 @@ using cur_para = struct _cpt
 {
     unsigned int panel_width{};
     unsigned int panel_height{};
+    unsigned int iwin_width{};
+    unsigned int iwin_height{};
+    unsigned int pu_en{};
+    unsigned int cur_ref_iwin{};
     unsigned int x_start{};
     unsigned int y_start{};
     unsigned int x_off{};
@@ -98,12 +102,10 @@ extern "C" void scl_panel_c(int src_w, int src_h, int dst_w, int dst_h,
     unsigned int h_acc_, unsigned int v_acc_, 
     std::string pid_ckp_fn, std::string pc_ckp_fn);
 
-extern "C" void overlay_c(bool efuse_sec, unsigned int res_w, unsigned int res_h,
-    unsigned int reg_bg_col, bool reg_bg_ycbcr, \
+extern "C" void overlay_c(bool efuse_sec, unsigned int res_w, unsigned int res_h, unsigned int reg_bg_col, bool reg_bg_ycbcr, \
     const ovl_stream& ovl0, const ovl_stream& ovl1, \
-    int curs_ovl_tp, bool is_curs_ycbcr, bool is_curs_int, unsigned short* psrc_0, unsigned short* psrc_1,
-    unsigned int* psrc_curs, unsigned short* pdst, \
-    win_c win_0, win_c win_1, win_c win_cur, int int_st_x, int int_st_y,
+    int curs_ovl_tp, bool is_curs_ycbcr, unsigned short* psrc_0, unsigned short* psrc_1,
+    unsigned int* psrc_curs, unsigned short* pdst, win_c w_0, win_c w_1, win_c w_c, win_c w_i, bool pu_en, bool is_ref_int_c,
     std::string oid_ckp_fn, std::string oc_ckp_fn);
 /**
  * @brief Interface of DPU's plane CSC module.

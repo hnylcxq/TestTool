@@ -944,6 +944,7 @@ enum {
 //input and output is 8 bit?
 void ovl_cur(unsigned char* cur_pix, int ovl_type, unsigned short* a_pix, unsigned short* out, bool is_cur_ycbcr, bool is_a_cbcr, bool& is_res_cbcr, bool is_valid)
 {
+    out[3] = 0xff;
     if (!is_valid)
     {
         memcpy(out, a_pix, sizeof(unsigned short) * 3);
@@ -1055,24 +1056,36 @@ void ovl_set_tag(ovl_in_de_tag &sig_tag, ovl_config_tag &reg_tag, bool efuse_sec
 
 }
 
-void adjust_win(win_c &win, bool is_ref_int, int int_st_x, int int_st_y)
+void adjust_win(win_c &win, bool is_ref_int, win_c wi)
 {
     win.x = win.x - 1; win.y = win.y - 1;
     if (is_ref_int)
     {
-        win.x += int_st_x; win.y += int_st_y;
+        win.x += wi.x; win.y += wi.y;
     }
     return;
 }
+//pu_en|| cur_ref_iwin
 //all internal data is ARGB,so UV's channel index is 0,1
-void overlay_c(bool efuse_sec, unsigned int res_w, unsigned int res_h, 
-    unsigned int reg_bg_col, bool reg_bg_ycbcr, \
+using ovl_wins = struct _ovlwins
+{
+    unsigned int res_w;
+    unsigned int res_h;
+    win_c _0;
+    win_c _1;
+    win_c _c;
+    win_c _i;
+    bool pu_en;
+    bool is_ref_int_c;
+};
+void overlay_c(bool efuse_sec, unsigned int res_w, unsigned int res_h, unsigned int reg_bg_col, bool reg_bg_ycbcr, \
     const ovl_stream& ovl0, const ovl_stream& ovl1, \
-    int curs_ovl_tp, bool is_curs_ycbcr, bool is_curs_int, unsigned short* psrc_0, unsigned short* psrc_1,
-    unsigned int* psrc_curs, unsigned short* pdst, \
-    win_c win_0, win_c win_1, win_c win_cur, int int_st_x, int int_st_y,
+    int curs_ovl_tp, bool is_curs_ycbcr, unsigned short* psrc_0, unsigned short* psrc_1,
+    unsigned int* psrc_curs, unsigned short* pdst, win_c w_0, win_c w_1, win_c w_c, win_c w_i,bool pu_en, bool is_ref_int_c_,
     std::string oid_ckp_fn, std::string oc_ckp_fn)
 {
+   
+   
     ckp_c::inst()->initial(true, oid_ckp_fn, OVL_IN_DE);
     ckp_c::inst()->initial(true, oc_ckp_fn, OVL_CONFIG);
     bus_1010108 sig_a{}, sig_b{}, sig_out{};
@@ -1080,17 +1093,30 @@ void overlay_c(bool efuse_sec, unsigned int res_w, unsigned int res_h,
     ovl_in_de_tag sig_tag;
     ovl_config_tag reg_tag;
     int cnt = 0;
-    int_st_x--;
-    int_st_y--;
+    bool is_ref_int_c = pu_en || is_ref_int_c_;
+    win_c win_cur_clamp;
+    w_i.x--;
+    w_i.y--;
+    //w_c.w = w_c.h = w_1.w = w_1.h = 0;
+    adjust_win(w_0, ovl0.is_ref_int, w_i);
+    adjust_win(w_1, ovl1.is_ref_int, w_i);
+    adjust_win(w_c, is_ref_int_c, w_i);
 
-    adjust_win(win_0, ovl0.is_ref_int, int_st_x, int_st_y);
-    adjust_win(win_1, ovl1.is_ref_int, int_st_x, int_st_y);
-    adjust_win(win_cur, is_curs_int, int_st_x, int_st_y);
-
-    if ((int)res_w < win_cur.w + win_cur.x)
-        win_cur.w = res_w - win_cur.x;
-    if ((int)res_h < win_cur.y + win_cur.h)
-        win_cur.h = res_h - win_cur.y;
+    if (is_ref_int_c)
+    {
+        win_cur_clamp = w_i;
+    }
+    else
+    {
+        win_cur_clamp.x = win_cur_clamp.y = 0;
+        win_cur_clamp.w = res_w;
+        win_cur_clamp.h = res_h;
+    }
+    //clamp for cursor
+    if ((int)win_cur_clamp.w + win_cur_clamp.x < w_c.w + w_c.x)
+        w_c.w = win_cur_clamp.w + win_cur_clamp.x - w_c.x;
+    if ((int)win_cur_clamp.h + win_cur_clamp.y < w_c.y + w_c.h)
+        w_c.h = win_cur_clamp.h + win_cur_clamp.y - w_c.y;
     
 
     ovl_set_tag(sig_tag, reg_tag, efuse_sec, res_w, res_h, reg_bg_col, reg_bg_ycbcr,ovl0, ovl1,curs_ovl_tp, is_curs_ycbcr);
@@ -1112,9 +1138,9 @@ void overlay_c(bool efuse_sec, unsigned int res_w, unsigned int res_h,
     unsigned short polv0_out[4], povl1_out[4],pdst_pix[4];
     unsigned short s0_in[4] = { 0 }, s1_in[4] = { 0 };
     int pos0 = -1, pos1 = -1, pos_curs = -1,pos = 0;
-    for (unsigned int y = 0;y < res_h; y++)
+    for (unsigned int y = 0.;y < res_h; y++)
     {
-        for (unsigned int x = 0;x < res_w;x++)
+        for (unsigned int x = 0 ;x < res_w;x++)
         {
             memcpy((unsigned int*)(&sig_a), &reg_bg_col, 4); //copy 0~2 channel
             sig_a.A = 0;
@@ -1123,9 +1149,9 @@ void overlay_c(bool efuse_sec, unsigned int res_w, unsigned int res_h,
             sig_a.is_ycbcr = reg_bg_ycbcr;
             sig_a.is_valid = true;
 
-            sig0_valid = get_valid_sig_pos(win_0, x , y, pos0);
-            sig1_valid = get_valid_sig_pos(win_1, x , y, pos1);
-            curs_valid = get_valid_sig_pos(win_cur, x ,y, pos_curs);
+            sig0_valid = get_valid_sig_pos(w_0, x , y, pos0);
+            sig1_valid = get_valid_sig_pos(w_1, x , y, pos1);
+            curs_valid = get_valid_sig_pos(w_c, x ,y, pos_curs);
 
             //do background ovl with stream 0
             memset(polv0_out, 0, sizeof(unsigned short) * 4);
@@ -1849,17 +1875,20 @@ void cursor_c(unsigned short* p_cur, cur_para para,
         return;
     }
 
-    if (x_off_on_panel + cur_valid_w > para.panel_width)
+    uint32_t win_width = (para.pu_en || para.cur_ref_iwin) ? para.iwin_width : para.panel_width;
+    uint32_t win_height = (para.pu_en || para.cur_ref_iwin) ? para.iwin_height : para.panel_height;
+
+    if (x_off_on_panel + cur_valid_w > win_width)
     {
-        *w_out = para.panel_width - x_off_on_panel;
+        *w_out = win_width - x_off_on_panel;
     }
     else
     {
         *w_out = cur_valid_w;
     }
-    if (y_off_on_panel + cur_valid_h > para.panel_height)
+    if (y_off_on_panel + cur_valid_h > win_height)
     {
-        *h_out = para.panel_height - y_off_on_panel;
+        *h_out = win_height - y_off_on_panel;
     }
     else
     {
@@ -2148,6 +2177,7 @@ void output_c(unsigned short* p_src, unsigned short* p_dst,
     {
         for (uint32_t x = 0; x < w; x++)
         {
+
         }
     }
 }

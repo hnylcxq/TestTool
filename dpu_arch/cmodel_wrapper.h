@@ -229,8 +229,13 @@ struct overlay_para_t
 	unsigned int is_curs_ycbcr;
 	unsigned int is_curs_ref_int;
 
+
+	unsigned int pu_en;
+
 	unsigned int iwin_start_x;
 	unsigned int iwin_start_y;
+	unsigned int iwin_width;
+	unsigned int iwin_height;
 
 	unsigned int dst_width;
 	unsigned int dst_height;

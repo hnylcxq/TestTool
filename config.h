@@ -1,19 +1,43 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
+
+
+
 #define    FLAG_BUFFER_BASE  0x0
-#define    FLAG_BUFFER_SIZE  0x1000000
+
 
 
 #define    SURFACE_MEM_BASE  (FLAG_BUFFER_BASE + FLAG_BUFFER_SIZE)
 #define    RESERVED_MEM_SIZE  (FLAG_BUFFER_SIZE)
 
 
-#define VENDER_XX     0x1d17
-//#define VENDER_XX	  	0x15ad
+#define  __KX6000__  0
+
+#if __KX6000__
+
+#define 	VENDER_XX     		0x1d17
+#define 	BAR_MMIO_OFFSET  	0x10
+#define 	BAR_FB_OFFSET  		0x14
+#define    	FLAG_BUFFER_SIZE  0x1000000
+
+
+
 //#define MAX_CRTC_NUM    3
 //#define MAX_DEVICE_NUM  3
 //#define MAX_PLANE_NUM   2
+#else
+
+#define 	VENDER_XX	  		0x15ad
+#define 	BAR_MMIO_OFFSET  	0x18
+#define 	BAR_FB_OFFSET  		0x14
+#define    	FLAG_BUFFER_SIZE    0x0
+
+
+
+
+#endif
+
 
 
 #define MAX_SURFACE_NUM         10
@@ -37,6 +61,8 @@
 #define SCRIPT_LINE_MAX_NUM   256
 #define SCRIPT_LINE_MAX_WORD_NUM    50
 #define SCRIPT_MAX_WORD_SIZE   MAX_CMD_OPTION_NAME_SIZE
+
+#define CMODEL_DEBUG  1
 
 
 #endif

@@ -180,7 +180,7 @@ void init_cached_cmd(struct dpu_adapter_t *dpu_adapter)
     plane->disable_plane = 0;
 
     //plane->overlay_info_valid = 0;
-    plane->overlay_cmd.k_valid = 0;
+   // plane->overlay_cmd.k_valid = 0;
     plane->overlay_cmd.m_valid = 0;
 
     device = &dpu_adapter->cached_cmd[DEVICE_CMD][0].device_cmd;

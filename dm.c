@@ -52,8 +52,10 @@ i32 dm_set_callback()
 i32 dm_init_sw(struct dpu_adapter_t *dpu_adapter)
 {
     i32 ret = 0;
+	u32 i = 0;
     void *p = NULL;
     struct dpu_init_sw_para_t sw_init_para = {0};
+	struct dpu_misc_feature_switch_t  setting = {0};
 
     memset(&sw_init_para, 0, sizeof(struct dpu_init_sw_para_t));
 
@@ -94,12 +96,65 @@ i32 dm_init_sw(struct dpu_adapter_t *dpu_adapter)
     sw_init_para.is_mamm_primary 		= dpu_adapter->base.flags.is_primary; 
 	sw_init_para.dpu_adapter 			= dpu_adapter;
 
+
+
+
+
     sw_init_para.mmio_base = dpu_adapter->base.mmio_base;
 
     sw_init_para.is_qt_test = dpu_adapter->flags.run_on_qt;
 
     dpu_adapter->dpu_manager = dpu_mgr_init(&sw_init_para);
 	printf("dpu_adapter->dpu_manager  is %p \n",dpu_adapter->dpu_manager );
+
+
+
+
+	//some switch work at initialize
+
+	setting.pipe_valid = 1;
+	setting.plane_0_valid = 1;
+	setting.plane_1_valid = 1;
+	setting.pipe_switch.bg_color = 0;
+	setting.pipe_switch.bg_ycbcr = 0;
+	setting.pipe_switch.dither_base = 0;
+	setting.pipe_switch.dither_bitsel = 0;
+	setting.pipe_switch.dither_dist_en = 0;
+	setting.pipe_switch.dither_en = 0;
+	setting.pipe_switch.lut_en = 0;
+	setting.pipe_switch.lut_intp_on = 0;
+	setting.pipe_switch.ovl0_alpha_key_sel = 0;
+	setting.pipe_switch.ovl0_alpha_rang = 0;
+	setting.pipe_switch.ovl0_color_key_sel = 0;
+	setting.pipe_switch.ovl1_alpha_key_sel = 0; 
+	setting.pipe_switch.ovl1_alpha_rang = 0;
+	setting.pipe_switch.ovl1_color_key_sel = 0;
+	setting.pipe_switch.pus_cos2tap = 0;
+	setting.pipe_switch.pus_ratio_mode = 1;// hw ratio
+	setting.pipe_switch.pus_ratio_plus = 0;
+	
+	setting.plane_switch[0].spl_alpha_ups = 1;
+	setting.plane_switch[0].spl_csc_bypass = 0;
+	setting.plane_switch[0].spl_htap = 1;
+	setting.plane_switch[0].spl_vdup = 1;
+	setting.plane_switch[0].spl_vtap = 1;
+	
+	setting.plane_switch[1].spl_alpha_ups = 1;
+	setting.plane_switch[1].spl_csc_bypass = 0;
+	setting.plane_switch[1].spl_htap = 1;
+	setting.plane_switch[1].spl_vdup = 1;
+	setting.plane_switch[1].spl_vtap = 1;
+
+	
+
+	for (i = 0; i < 3; i++)
+	{
+		setting.crtc = i;
+
+		dpu_set_misc_feature_switch(dpu_adapter->dpu_manager, &setting);
+	}
+
+
 
     return 0;
 }

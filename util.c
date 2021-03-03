@@ -484,15 +484,9 @@ TT_STATUS tt_get_linear_addr(u64 phy_addr, u32 size, void **linear_addr)
 {
 	return platform_funcs->platform_get_linear_addr(phy_addr, size, linear_addr);
 }
-static u32 get_bar_size(u32 bus, u32 dev, u32 func,u32 fb)
+static u32 get_bar_size(u32 bus, u32 dev, u32 func,u32 offset)
 {
     u32 temp, value, size;
-	u32 offset = 0x10;
-
-	if (fb == 1)
-	{
-		offset = 0x14;
-	}
 
     tt_read_pci_config_dword(bus, dev, func, offset, &temp);
     value = temp;
@@ -607,8 +601,8 @@ done_1:
 	
 done_2:
     //bar0 info
-    tt_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0x10, &value);
-	size = get_bar_size(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0);
+    tt_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, BAR_MMIO_OFFSET, &value);
+	size = get_bar_size(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, BAR_MMIO_OFFSET);
     value = value & ~0xf; //mask flag bit
 	if (TT_PASS == tt_get_linear_addr((u64)value, size, &temp))
     {
@@ -616,7 +610,7 @@ done_2:
 		base_adapter->mmio_size = size;
 		base_adapter->mmio_phy = value;
 
-		dpu_info(INFO_LEVEL, "mmio phy_addr is 0x%x size 0x%x mmio vir_addr 0x%x\n", value, size, temp);
+		dpu_info(INFO_LEVEL, "mmio phy_addr is 0x%x size 0x%x mmio vir_addr %p\n", value, size, temp);
     }
     else
     {
@@ -628,15 +622,15 @@ done_2:
 	
 	//bar1 info
 
-    tt_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 0x14, &value);
-    size = get_bar_size(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, 1);
+    tt_read_pci_config_dword(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, BAR_FB_OFFSET, &value);
+    size = get_bar_size(base_adapter->bus_num, base_adapter->dev_num, base_adapter->func_num, BAR_FB_OFFSET);
 	value = value & ~0xF;
     if (TT_PASS == tt_get_linear_addr((u64)value, size, &temp))
     {
         base_adapter->fb_base = temp;
         base_adapter->fb_size = size;
 		base_adapter->fb_phy = value;
-		dpu_info(INFO_LEVEL, "fb   phy_addr is 0x%x size 0x%x fb   vir_addr 0x%x\n", value, size, temp);
+		dpu_info(INFO_LEVEL, "fb   phy_addr is 0x%x size 0x%x fb   vir_addr %p\n", value, size, temp);
     }
 
 exit:	
@@ -1395,7 +1389,7 @@ TT_STATUS  tt_create_surface(struct dpu_adapter_t *dpu_adapter, struct surface_c
         surface->pitch
         );
 
-    dpu_info(INFO_LEVEL,"gpu_addr is 0x%x, cpu_addr is 0x%x, fb base is 0x%x\n",surface->gpu_addr, surface->cpu_addr, dpu_adapter->base.fb_base);
+    dpu_info(INFO_LEVEL,"gpu_addr is %p, cpu_addr is %p, fb base is %p \n",surface->gpu_addr, surface->cpu_addr, dpu_adapter->base.fb_base);
 
     //TODO:
     //draw surface with alpha & color pattern & format

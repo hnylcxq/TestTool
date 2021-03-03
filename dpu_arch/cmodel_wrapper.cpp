@@ -254,10 +254,11 @@ void overlay_wrapper(struct overlay_para_t *para)
     reg1.is_ycbcr = para->ovl1_is_ycbcr;
 
     bool is_cur_ref_int = para->is_curs_ref_int;
-    win_c win0, win1, win_cur;
+	bool pu_en = para->pu_en;
+    win_c win0, win1, win_cur, win_i;
 
-    int int_stx = para->iwin_start_x;
-    int int_sty = para->iwin_start_y;
+    //int int_stx = para->iwin_start_x;
+    //int int_sty = para->iwin_start_y;
     //win0 = update_win(m_dp.s0_tag, int_stx, int_sty, reg0.is_ref_int);
     //win1 = update_win(m_dp.s1_tag, int_stx, int_sty, reg1.is_ref_int);
    // win_cur = update_win(m_dp.cur_tag, int_stx, int_sty, is_cur_ref_int);
@@ -276,6 +277,12 @@ void overlay_wrapper(struct overlay_para_t *para)
 	win_cur.y = para->win_cur_start_y;
 	win_cur.w = para->win_cur_width;
 	win_cur.h = para->win_cur_height;
+
+	win_i.x = para->iwin_start_x;
+	win_i.y = para->iwin_start_y;
+
+	win_i.w = para->iwin_width;
+	win_i.h = para->iwin_height;
 	
 
 	if(!para->dst)
@@ -284,11 +291,9 @@ void overlay_wrapper(struct overlay_para_t *para)
 	}
 
     if (!m_is_ref_chk_en)
-        overlay_c(true, para->dst_width, para->dst_height,
-            para->bg_color, para->bg_ycbcr, reg0, reg1, para->cur_type,
-            para->is_curs_ycbcr, is_cur_ref_int, (uint16_t*)para->win0_src, (uint16_t*)para->win1_src,
-            (uint32_t*)para->cur_src, (uint16_t*)para->dst,
-            win0, win1, win_cur, int_stx, int_sty,
+        overlay_c(true, para->dst_width, para->dst_height, para->bg_color, para->bg_ycbcr, reg0, reg1, para->cur_type, 
+        para->is_curs_ycbcr, (uint16_t*)para->win0_src, (uint16_t*)para->win1_src, 
+        (uint32_t*)para->cur_src, (uint16_t*)para->dst,  win0, win1, win_cur, win_i, pu_en ,is_cur_ref_int,
             FILE_NAME[OVL_IN_DE], FILE_NAME[OVL_CONFIG]);
 
     return;
