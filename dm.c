@@ -123,13 +123,13 @@ i32 dm_init_sw(struct dpu_adapter_t *dpu_adapter)
 	setting.pipe_switch.dither_en = 0;
 	setting.pipe_switch.lut_en = 0;
 	setting.pipe_switch.lut_intp_on = 0;
-	setting.pipe_switch.ovl0_alpha_key_sel = 0;
+	setting.pipe_switch.ovl0_alpha_key_sel = 2;
 	setting.pipe_switch.ovl0_alpha_rang = 0;
-	setting.pipe_switch.ovl0_color_key_sel = 0;
-	setting.pipe_switch.ovl1_alpha_key_sel = 0; 
+	setting.pipe_switch.ovl0_color_key_sel = 1;
+	setting.pipe_switch.ovl1_alpha_key_sel = 2; 
 	setting.pipe_switch.ovl1_alpha_rang = 0;
 	setting.pipe_switch.ovl1_color_key_sel = 0;
-	setting.pipe_switch.pus_cos2tap = 0;
+	setting.pipe_switch.pus_cos2tap = 1;
 	setting.pipe_switch.pus_ratio_mode = 1;// hw ratio
 	setting.pipe_switch.pus_ratio_plus = 0;
 	

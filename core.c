@@ -150,6 +150,16 @@ static struct options_table plane_options_table[] =
 };
 
 
+
+
+
+//need refine later : 
+//1,assign a surface handle by user
+//2,ld cmd support load file to surface handle( 20210303 done)
+//if surface handle has alloc video memory, then check widht/pitch/height/fmt etc
+//if has same caps ,no need alloc new video memory, otherwize free the old video memory ,alloc new video memory
+//purpose: user could use a certain surface handle for flip
+
 static struct options_table surface_options_table[] = 
 {
    {"c", "[-c ] compressed ", 1, {{10, NULL, &g_surface_cmd.compressed},}},
@@ -432,16 +442,14 @@ static TT_STATUS mode_handle(struct dpu_adapter_t *dpu_adapter, struct mode_cmd_
 	output_info = &dpu_adapter->current_output_info[tt_get_last_bit(prepare_cmd.output)];
 	crtc_info = &dpu_adapter->current_crtc_info[prepare_cmd.crtc_index];
 
-	if (0)//!(prepare_cmd.output_signal & output_info->display_caps.support_signal.output_signal))
+	if (!(prepare_cmd.output_signal & output_info->display_caps.support_signal.output_signal))
 	{
-		dpu_info(INFO_LEVEL,"invalid output signal\n");
-		goto end;
+		dpu_info(INFO_LEVEL,"Warring: monitor doesn't support  output signal %d\n",prepare_cmd.output_signal);
 	}
 
-	if (0)//!(prepare_cmd.bpc > output_info->display_caps.max_color_depth))
+	if (!(prepare_cmd.bpc > output_info->display_caps.max_color_depth))
 	{
-		dpu_info(INFO_LEVEL,"bpc %d out of range\n", prepare_cmd.bpc);
-		goto end;
+		dpu_info(INFO_LEVEL,"Warring: monitor doesn't support  bpc %d \n", prepare_cmd.bpc);
 	}
 
 	if (!match_mode(&output_info->mode_list, &crtc_info->hw_mode, prepare_cmd.src_xres, prepare_cmd.src_yres, prepare_cmd.rr))
@@ -643,7 +651,7 @@ static void plane_handle_info(struct dpu_adapter_t *dpu_adapter)
             }
             else
             {
-                dpu_info(INFO_LEVEL,"      plane %d :src(%d,%d,%d,%d) dst(%d,%d,%d,%d) g_addr 0x%08x c_addr 0x%8x size (%d,%d) pitch %d, fmt %s, compress %d si %d\n",
+                dpu_info(INFO_LEVEL,"      plane %d :src(%d,%d,%d,%d) dst(%d,%d,%d,%d) g_addr 0x%08x c_addr 0x%8x size (%d,%d) pitch %d, fmt %s, compress %d sur_index %d\n",
                     plane_info->plane_type,
                     plane_info->src_x,
                     plane_info->src_y,
@@ -906,7 +914,6 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
         prepare_cmd.overlay_cmd.key_valid = 1;
     }
 
-	printf("lei key_high is 0x%x  low 0x%x\n", prepare_cmd.overlay_cmd.key_high,prepare_cmd.overlay_cmd.key_low);
 
     //check is new cmd or not
     for (i = 0 ;i < MAX_CACHED_CMD_NUM; i++)
@@ -1060,9 +1067,9 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
 					plane_info->overlay_info.key_low = prepare_cmd.overlay_cmd.key_low;
 					plane_info->overlay_info.key_high = prepare_cmd.overlay_cmd.key_high;
 
-					printf("prepare kp %d ks %d key low 0x%x key_h 0x%x\n", prepare_cmd.overlay_cmd.kp,prepare_cmd.overlay_cmd.ks,prepare_cmd.overlay_cmd.key_low,prepare_cmd.overlay_cmd.key_high);
-					printf("planei  kp %d ks %d key low 0x%x key_h 0x%x\n",plane_info->overlay_info.kp,plane_info->overlay_info.ks,plane_info->overlay_info.key_low,
-						plane_info->overlay_info.key_high);
+					//printf("prepare kp %d ks %d key low 0x%x key_h 0x%x\n", prepare_cmd.overlay_cmd.kp,prepare_cmd.overlay_cmd.ks,prepare_cmd.overlay_cmd.key_low,prepare_cmd.overlay_cmd.key_high);
+					//printf("planei  kp %d ks %d key low 0x%x key_h 0x%x\n",plane_info->overlay_info.kp,plane_info->overlay_info.ks,plane_info->overlay_info.key_low,
+					//	plane_info->overlay_info.key_high);
 
 
 					plane_set.base.overlay.mode = DPU_SOP_WINDOW_KEY;
@@ -2653,6 +2660,19 @@ static void handle_file(struct dpu_adapter_t *dpu_adapter, u8 buffer[][MAX_CMD_O
     file_name = buffer[1];
     offset = strtoul(buffer[2], NULL, 16);
 
+
+	if(offset < MAX_SURFACE_NUM)
+	{
+		if (dpu_adapter->surface_manager.surfaces[offset].valid)
+		{
+			offset = dpu_adapter->surface_manager.surfaces[offset].surface.gpu_addr;
+		}
+		else
+		{
+			dpu_info(INFO_LEVEL, "surface %d has no video memory yet\n",offset);
+			return ;
+		}
+	}
        
 
     if (op == OP_READ)
@@ -3096,6 +3116,8 @@ void prepare_overlay_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_en
 	para->ovl1_is_ref_int = hw_env->itg.spl_ref_iwin;
 	para->ovl1_is_ycbcr =  hw_env->spl[1].csc.output_fmt > 1 ? 1 : 0;
 
+	para->pu_en = hw_env->pu.pus_en;
+
 	if (hw_env->spl[0].spl_en)
 	{
 		para->win_0_start_x = hw_env->spl[0].start_x;
@@ -3117,6 +3139,13 @@ void prepare_overlay_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_en
 		para->win_1_start_y = hw_env->spl[1].start_y;
 		para->win_1_width = hw_env->spl[1].dst_w;
 		para->win_1_height = hw_env->spl[1].dst_h;
+	}
+	else
+	{
+		para->win_1_start_x = 1;
+		para->win_1_start_y = 1;
+		para->win_1_width = 0;
+		para->win_1_height = 0;
 	}
 
 	if (hw_env->cur.cur_en)
@@ -3155,6 +3184,79 @@ void prepare_overlay_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_en
 
 	para->dst = (unsigned short*)args->background;
 
+	cmodel_debug(INFO_LEVEL,"pu_en is %d iwin_start_x  %d iwin_start_y %d  iwin_w %d iwin_h %d d_w %d, d_h %d\n",
+			para->pu_en,
+			para->iwin_start_x,
+			para->iwin_start_y,
+			para->iwin_width,
+			para->iwin_height,
+			para->dst_width,
+			para->dst_height);
+
+	
+
+	cmodel_debug(INFO_LEVEL,"spl0  width %d height %d rect[%d,%d,%d,%d] \n",
+						para->win_0_width, 
+						para->win_0_height,
+						para->win_0_start_x,
+						para->win_0_start_y,
+						para->win_0_width,
+						para->win_0_height);
+
+	cmodel_debug(INFO_LEVEL,"spl1  width %d height %d rect[%d,%d,%d,%d] \n",
+						para->win_1_width, 
+						para->win_1_height,
+						para->win_1_start_x,
+						para->win_1_start_y,
+						para->win_1_width,
+						para->win_1_height);
+	cmodel_debug(INFO_LEVEL,"cursor  width %d height %d rect[%d,%d,%d,%d] \n",
+						para->win_cur_width, 
+						para->win_cur_height,
+						para->win_cur_start_x,
+						para->win_cur_start_y,
+						para->win_cur_width,
+						para->win_cur_height);
+
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: bg_color is %d bg_ycbcr is %d\n", para->bg_color, para->bg_ycbcr);
+
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: key_mode_0 %d, pla_fct_0 %d plb_fct_0 %d bld_mode_0 %d is_inv_alpha_0 %d\n",
+		para->ovl0_key_mode,
+		para->ovl0_pla_fct,
+		para->ovl0_plb_fct,
+		para->ovl0_bld_mode,
+		para->ovl0_is_inv_alpha);
+	
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: plane_alpha_0 0x%x alpha_key_sel_0 %d is_alpha_rang_0 %d color_key_sel_0 %d is_ycbcr_0 %d is_mdi_sec_0 %d  is_ref_int_0 %d\n",
+		para->ovl0_plane_alpha_val,
+		para->ovl0_alpha_key_sel,
+		para->ovl0_is_alpha_rang,
+		para->ovl0_color_key_sel,
+		para->ovl0_is_ycbcr,
+		para->ovl0_is_mdi_sec,
+		para->ovl0_is_ref_int);
+	
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: key_mode_1 %d, pla_fct_1 %d plb_fct_1 %d bld_mode_1 %d is_inv_alpha_1 %d\n",
+		para->ovl1_key_mode,
+		para->ovl1_pla_fct,
+		para->ovl1_plb_fct,
+		para->ovl1_bld_mode,
+		para->ovl1_is_inv_alpha);
+
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: plane_alpha_1 0x%x alpha_key_sel_1 %d is_alpha_rang_1 %d color_key_sel_1 %d is_ycbcr_1 %d is_mdi_sec_1 %d  is_ref_int_1 %d\n",
+		para->ovl1_plane_alpha_val,
+		para->ovl1_alpha_key_sel,
+		para->ovl1_is_alpha_rang,
+		para->ovl1_color_key_sel,
+		para->ovl1_is_ycbcr,
+		para->ovl1_is_mdi_sec,
+		para->ovl1_is_ref_int);
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: cursor type %d cur_ycbcr %d  cur_is_int %d efuse_sec %d\n",
+		para->cur_type,
+		para->is_curs_ycbcr,
+		para->is_curs_ref_int,
+		0);
+
 }
 
 void prepare_scl_panel_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_env, struct scl_panel_para_t* para)
@@ -3186,6 +3288,26 @@ void prepare_scl_panel_args(struct cmodel_args_t  *args, struct de_hw_env_t *hw_
 
 	para->src = (unsigned short *)args->background;
 	para->dst = (unsigned short *)args->pipe_pu_dst;
+
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: pu_en %d h_en %d v_en %d h_acc 0x%x v_acc 0x%x is_cos %d is_hw_ratio %d ratio_pus %d bg 0x%x\n",
+		para->en,
+		para->h_en,
+		para->v_en,
+		para->h_acc,
+		para->v_acc,
+		para->is_cos,
+		para->is_hw_ratio,
+		para->ratio_plus,
+		para->bg_color);
+	cmodel_debug(INFO_LEVEL,"cmodel_dump: s_w %d s_h %d d_w %d d_h %d start_x %d start_y %d dest_w %d dest_h %d\n",
+		para->src_w,
+		para->src_h,
+		para->dst_w,
+		para->dst_h,
+		para->start_x,
+		para->start_y,
+		para->panel_width,
+		para->panel_height);
 
 }
 
@@ -3362,32 +3484,35 @@ TT_STATUS do_dpu_process(struct dpu_adapter_t *dpu_adapter, u32 crtc, u64* sw_si
 	if (hw_env.spl[0].spl_en)
 	{
 		prepare_input_args(&args, &hw_env, &input_para, 0);
-
-		dump_data("spl0_input_src.bin", input_para.src, 4, input_para.width, input_para.height);
-		input_wrapper(&input_para); 
-		dump_data("spl0_input_dst.bin", input_para.dst, 8, input_para.width, input_para.height);
-
+		dump_data("dump_data/spl0_input_src.bin", input_para.src, 4, input_para.width, input_para.height);
 		
+		input_wrapper(&input_para); 
+		dump_data("dump_data/spl0_input_dst.bin", input_para.dst, 8, input_para.width, input_para.height);
+
 		prepare_scl_stream_args(&args, &hw_env, &scl_stream_para, 0);
 		scl_stream_wrapper(&scl_stream_para);
-
-		dump_data("spl0_scl_dst.bin", scl_stream_para.dst, 8, scl_stream_para.dst_w, scl_stream_para.dst_h);
-
+		dump_data("dump_data/spl0_scl_dst.bin", scl_stream_para.dst, 8, scl_stream_para.dst_w, scl_stream_para.dst_h);
 		
 		prepare_csc_plane_args(&args, &hw_env, &csc_plane_para, 0);
 	    csc_plane_wrapper(&csc_plane_para);
-
-		dump_data("spl0_csc_dst.bin", csc_plane_para.dst, 8, csc_plane_para.width, csc_plane_para.height);
+		dump_data("dump_data/spl0_csc_dst.bin", csc_plane_para.dst, 8, csc_plane_para.width, csc_plane_para.height);
 	}
 
 	if (hw_env.spl[1].spl_en)
 	{
 		prepare_input_args(&args, &hw_env, &input_para, 1);
+		dump_data("dump_data/spl1_input_src.bin", input_para.src, 4, input_para.width, input_para.height);
+
 		input_wrapper(&input_para);
+		dump_data("dump_data/spl1_input_dst.bin", input_para.dst, 8, input_para.width, input_para.height);
+
 		prepare_scl_stream_args(&args, &hw_env, &scl_stream_para, 1);
 		scl_stream_wrapper(&scl_stream_para);
+		dump_data("dump_data/spl1_scl_dst.bin", scl_stream_para.dst, 8, scl_stream_para.dst_w, scl_stream_para.dst_h);
+
 		prepare_csc_plane_args(&args, &hw_env, &csc_plane_para, 1);
 		csc_plane_wrapper(&csc_plane_para);
+		dump_data("dump_data/spl1_csc_dst.bin", csc_plane_para.dst, 8, csc_plane_para.width, csc_plane_para.height);
 	}
 
 	if (hw_env.cur.cur_en)
@@ -3399,25 +3524,31 @@ TT_STATUS do_dpu_process(struct dpu_adapter_t *dpu_adapter, u32 crtc, u64* sw_si
 		csc_cursor_wrapper(&csc_cursor_para);
 	}
 
-	//overlay bg,spl0,spl1,cursor together to  bg layer
+	//overlay bg,spl0,spl1,cursor together to  bg layer(destinatio window) ,need iwin info
 	prepare_overlay_args(&args, &hw_env, &overlay_para, out_w, out_h);
 	overlay_wrapper(&overlay_para);
+
+	dump_data("dump_data/pipe_ovl_dst.bin", overlay_para.dst, 8, overlay_para.dst_width, overlay_para.dst_height);
 
 	prepare_scl_panel_args(&args, &hw_env, &scl_panel_para);
 	//if pu is diable ,will copy src to dst
 	scl_panel_wrapper(&scl_panel_para);
+	dump_data("dump_data/pipe_scl_dst.bin", scl_panel_para.dst, 8, scl_panel_para.panel_width, scl_panel_para.panel_height);
 
 	prepare_lut_args(&args, &hw_env, &lut_para);
 	//pass lut, will copy src to dst
 	lut_wrapper(&lut_para);
+	dump_data("dump_data/pipe_lut_dst.bin", lut_para.dst, 8, lut_para.width, lut_para.height);
 
 	prepare_csc_panel_args(&args, &hw_env, &csc_plane_para);
 	//can't bypass csc,  translate src to dst
 	csc_plane_wrapper(&csc_plane_para);
+	dump_data("dump_data/pipe_lut_dst.bin", csc_plane_para.dst, 8, csc_plane_para.width, csc_plane_para.height);
 
 	prepare_dither_args(&args, &hw_env, &dither_para);
 	//pass dither, will copy src to dst
 	dither_wrapper(&dither_para);
+	dump_data("dump_data/pipe_lut_dst.bin", dither_para.dst, 8, dither_para.width, dither_para.height);
 
 	prepare_signature_args(&args, &hw_env, &signature_para);
 	*sw_sig = signature_wrapper(&signature_para);
