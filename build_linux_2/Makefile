@@ -1,16 +1,13 @@
 DE_PATH    = ../../DE
 TEST_TOOL_PATH = ../../TestTool
 
-
-
-VERSION = 1.00
 CC	= gcc
 CC_CPP = g++
 LINK = g++
 DEBUG =-D__DPU_LINUX_KERNEL__
 CFLAGS=   -Werror 
 #-Wall
-CPPFLAGS = 
+CPPFLAGS = -Werror 
 
 TARGET = TestTool
 
