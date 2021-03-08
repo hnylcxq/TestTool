@@ -12,14 +12,14 @@
 #define    RESERVED_MEM_SIZE  (FLAG_BUFFER_SIZE)
 
 
-#define  __KX6000__  0
+#define  __KX6000__  1
 
 #if __KX6000__
 
 #define 	VENDER_XX     		0x1d17
 #define 	BAR_MMIO_OFFSET  	0x10
 #define 	BAR_FB_OFFSET  		0x14
-#define    	FLAG_BUFFER_SIZE  0x1000000
+#define    	FLAG_BUFFER_SIZE  	0x1000000
 
 
 

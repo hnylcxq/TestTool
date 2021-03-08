@@ -2,9 +2,11 @@
 #include<stdlib.h>
 #include<string.h>
 
+
 #include"list.h"
 #include"types.h"
 #include"util.h"
+#include"script.h"
 
 
 

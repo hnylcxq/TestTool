@@ -8,6 +8,8 @@
 #include"config.h"
 
 #include"dpu.h"
+#include"script.h"
+
 
 
 #if CMODEL_DEBUG
@@ -989,7 +991,7 @@ static TT_STATUS plane_handle(struct dpu_adapter_t *dpu_adapter, struct plane_cm
 
         }
 
-		plane_set.base.surface.addr = (plane_set.flag != DPU_DISABLE_FLIP) ? surface->gpu_addr : 0x12345680;
+		plane_set.base.surface.addr = (plane_set.flag != DPU_DISABLE_FLIP) ? (u32_t)surface->gpu_addr : 0x12345680;
 
         plane_set.base.surface.format = surface->format;
         plane_set.base.surface.width = surface->width;

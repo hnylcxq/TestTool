@@ -51,13 +51,13 @@ typedef TT_STATUS (*platform_deinit_fn)(struct dpu_adapter_t *dpu_adapter);
 typedef void (*platform_print_fn)(u8 * string);
 
 
-typedef void (*platform_read_pci_config_word_fn)(u8 bus, u8 dev, u8 func, u16 reg, u16 *data);
-typedef void (*platform_read_pci_config_byte_fn)(u8 bus, u8 dev, u8 func, u16 reg, u8 *data);
-typedef void (*platform_read_pci_config_dword_fn)(u8 bus, u8 dev, u8 func, u16 reg, u32 *data);
+typedef u16 (*platform_read_pci_config_word_fn)(u8 bus, u8 dev, u8 func, u16 reg, u16 *data);
+typedef u16 (*platform_read_pci_config_byte_fn)(u8 bus, u8 dev, u8 func, u16 reg, u8 *data);
+typedef u16 (*platform_read_pci_config_dword_fn)(u8 bus, u8 dev, u8 func, u16 reg, u32 *data);
 
-typedef void (*platform_write_pci_config_dword_fn)(u8 bus, u8 dev, u8 func, u16 reg, u32 data);
-typedef void (*platform_write_pci_config_word_fn)(u8 bus, u8 dev, u8 func,u16 reg,  u16 data);
-typedef void (*platform_write_pci_config_byte_fn)(u8 bus, u8 dev, u8 func,u16 reg, u8 data);
+typedef u16 (*platform_write_pci_config_dword_fn)(u8 bus, u8 dev, u8 func, u16 reg, u32 data);
+typedef u16 (*platform_write_pci_config_word_fn)(u8 bus, u8 dev, u8 func,u16 reg,  u16 data);
+typedef u16 (*platform_write_pci_config_byte_fn)(u8 bus, u8 dev, u8 func,u16 reg, u8 data);
 
 
 typedef u8 (*platform_read_io_byte_fn)(u16 register_port);
@@ -131,8 +131,6 @@ void 	tt_write_io_byte(u16 register_port, u8 value);
 u32 	tt_read_io_dword(u16 register_port);
 void 	tt_write_io_dword(u16 register_port, u32 value);
 
-u8 		tt_read_mmio_byte(u32 base, u32 port);
-void	tt_write_mmio_byte(u32 base, u32 port, u8 value, u8 mask);
 u32 	tt_read_mmio(u32 base , u32 port);
 void 	tt_write_mmio(u32 base, u32 port, u32 value, u32 mask);
 

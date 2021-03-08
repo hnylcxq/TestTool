@@ -187,7 +187,7 @@ TT_STATUS linux_get_linear_addr(u64 phy_addr, u32 size, void **linear_addr)
 
 	fd = open("/dev/tt_device", O_RDWR, 0);
 
-	printf("phy addr is 0x%x ,size is 0x%x\n", phy_addr, size);
+	printf("phy addr is 0x%llx ,size is 0x%x\n", phy_addr, size);
 
 	if(fd >= 0)
 	{

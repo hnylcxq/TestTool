@@ -309,7 +309,7 @@ struct surface_info_t
     u32    range_type;         //TODO
     SURFACE_PATTERN   pattern;
 
-    void*    gpu_addr;
+    u32      gpu_addr;
     void*    cpu_addr;
 
     u8     alpha;

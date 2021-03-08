@@ -1,7 +1,8 @@
 #include "types.h"
 #include "config.h"
 #include "util.h"
-
+#include<stdlib.h>
+#include<string.h>
 
 /*
     video memory layout( local framebuffer only)
@@ -32,11 +33,6 @@
 */
 
 
-
-
-
-
-void delete_node(struct list_header *head, struct list_block* delete_node);
 
 void add_node(struct list_header *head, struct list_block *new_node, u32 could_merge)
 {

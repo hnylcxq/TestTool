@@ -3,6 +3,9 @@
 #include"types.h"
 #include<stdio.h>
 #include<string.h>
+#include<stdlib.h>
+#include"dm.h"
+
 
 //所有call cbios 的interface 都需要走这里下去，相当于disp层，做参数转换的。
 //display manager is a simple layer
@@ -97,10 +100,6 @@ i32 dm_init_sw(struct dpu_adapter_t *dpu_adapter)
 	sw_init_para.dpu_adapter 			= dpu_adapter;
 
 
-
-
-
-    sw_init_para.mmio_base = dpu_adapter->base.mmio_base;
 
     sw_init_para.is_qt_test = dpu_adapter->flags.run_on_qt;
 
@@ -259,7 +258,7 @@ void dm_init_output(struct dpu_adapter_t *dpu_adapter)
 
 		if (output_info->mode_list.modes != NULL)
 		{
-			free(output_info->mode_list.modes);
+			tt_free_mem(output_info->mode_list.modes);
 			output_info->mode_list.modes = NULL;
 		}
 

@@ -1,6 +1,9 @@
 #include"types.h"
 #include"util.h"
-
+#include<stdlib.h>
+#include<string.h>
+#include"dm.h"
+#include"mem.h"
 
 struct dpu_adapter_t  *g_dpu_adapter = NULL;
 
@@ -395,7 +398,7 @@ int main(int argc, char** argv)
 
 	deinit_dm(p);
 
-	deinit_video_memory();
+	deinit_video_memory(p);
 
 	tt_deinit_platform(p);
 

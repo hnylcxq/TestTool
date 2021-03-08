@@ -1,9 +1,10 @@
 #include<stdio.h>
 #include<string.h>
 #include<stdarg.h>
-
+#include<stdlib.h>
 //#include"types.h"
 #include"util.h"
+#include"mem.h"
 
 #define LOG_BUFFER_SIZE     256
 
@@ -271,7 +272,7 @@ void tt_write_u32(void * adapter, u32 register_port, u32 value)
 	u32 ul_align_mask = sizeof(u32) - 1;
 	
 	port = (u32 *)((u8*)dpu_adapter->base.mmio_base + register_port);
-	if ((u32)port & ul_align_mask)
+	if (register_port & ul_align_mask)
 	{
 		dpu_info(ERROR_LEVEL,"The port address 0x%x is not aligned \n",register_port);
 	}
@@ -288,7 +289,7 @@ u32 tt_read_u32(void * adapter, u32 register_port)
 
 	//printf("dpu_adapter, 0x%x dpu_adapter->base.mmio_base is 0x%x 0x%x\n",dpu_adapter, dpu_adapter->base.mmio_base, register_port);
 	port = (u32 *)((u8*)dpu_adapter->base.mmio_base + register_port);
-	if ((u32)port & ul_align_mask)
+	if (register_port & ul_align_mask)
 	{
 		dpu_info(ERROR_LEVEL,"The port address 0x%x is not aligned  %p mask 0x%x\n",register_port,port,ul_align_mask);
 	}
@@ -318,7 +319,7 @@ void tt_read_u16(void * adapter, u32 register_port)
 	u16  ul_align_mask = sizeof(u16) - 1;
 	
 	port = (u16 *)((u8*)dpu_adapter->base.mmio_base + register_port);
-	if ((u32)port & ul_align_mask)
+	if (register_port & ul_align_mask)
 	{
 		dpu_info(ERROR_LEVEL,"The port address 0x%x is not aligned \n",register_port);
 	}
@@ -332,7 +333,7 @@ void tt_write_u16(void * adapter, u32 register_port, u16 value)
 	u32  ul_align_mask = sizeof(u16) - 1;
 	
 	port = (u16 *)((u8*)dpu_adapter->base.mmio_base + register_port);
-	if ((u16)port & ul_align_mask)
+	if (register_port & ul_align_mask)
 	{
 		dpu_info(ERROR_LEVEL,"The port address 0x%x is not aligned \n",register_port);
 	}
@@ -344,7 +345,7 @@ u32 tt_read_buffer_u32(volatile u32 *register_port)
 	u32 value = 0;
 	u32 ul_align_mask = sizeof(u32) - 1;
 	
-	if ((u32)register_port & ul_align_mask)
+	if ((u64)register_port & ul_align_mask)
 	{
 		dpu_info(ERROR_LEVEL,"The mem address 0x%x is not aligned \n",register_port);
 	}
@@ -356,7 +357,7 @@ void tt_write_buffer_u32(volatile u32 * register_port, u32 value)
 {
 	u32 ul_align_mask = sizeof(u32) - 1;
 	
-	if ((u32)register_port & ul_align_mask)
+	if ((u64)register_port & ul_align_mask)
 	{
 		dpu_info(ERROR_LEVEL,"The mem address 0x%x is not aligned \n",register_port);
 	}
@@ -385,40 +386,6 @@ void tt_write_io_dword(u16 register_port, u32 value)
 }
 
 
-u8 tt_read_mmio_byte(u32 base, u32 port)
-{
-    u8 value = 0;
-
-    value = *((u8 *)(base + port));
-    return value;
-}
-
-void tt_write_mmio_byte(u32 base, u32 port, u8 value, u8 mask)
-{
-    u8 temp = 0;
-
-    temp = *((u8 *)(base + port));
-    temp = temp & mask;
-    temp = temp | value;
-
-    *((u8 *)(base + port)) = temp;
-}
-
-u32 tt_read_mmio(u32 base , u32 port)
-{
-    return *((u32*)(base + port));
-}
-
-void tt_write_mmio(u32 base, u32 port, u32 value, u32 mask)
-{
-    u32 temp;
-
-    temp = *((u32*)(base + port));
-    temp = temp & mask;
-    value = value & ~mask;
-    temp = temp | value;
-    *((u32*)(base + port)) = temp;
-}
 
 void * tt_malloc_mem(u32 bytes)
 {
